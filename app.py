@@ -1368,325 +1368,325 @@ elif st.session_state.current_page == 'cohort':
     )
 
     if uploaded_file is not None:
-        try:
-            # Загрузка Excel файла
-            if uploaded_file.name.endswith('.xlsx'):
-                df = pd.read_excel(uploaded_file, engine='openpyxl')
-            else:
-                df = pd.read_excel(uploaded_file, engine='xlrd')
-            
-            # Сохранение данных в session state
-            # Проверяем, новый ли это файл
-            is_new_file = (
-                st.session_state.uploaded_data is None or 
-                st.session_state.uploaded_data.name != uploaded_file.name
-            )
-            
-            st.session_state.uploaded_data = uploaded_file
-            st.session_state.df = df
-            
-            # Очищаем старую информацию только при загрузке нового файла
-            if is_new_file:
-                st.session_state.cohort_info = None
-                st.session_state.cohort_matrix = None
-                st.session_state.sorted_periods = None
-                st.session_state.year_month_col = None
-                st.session_state.client_col = None
-            
-            # Построение когортной матрицы
-            st.markdown("---")
-            
-            # Определяем столбцы автоматически
-            expected_columns = {
-                'Год-месяц': 'Год-месяц',
-                'Год-Неделя': 'Год-Неделя',
-                'Год-неделя': 'Год-неделя',
-                'Год-Месяц': 'Год-Месяц',
-                'Код клиента': 'Код клиента'
-            }
-            
-            # Проверяем наличие ожидаемых столбцов
-            year_month_col = None
-            client_col = None
-            
-            # Ищем столбец с периодом (год-месяц или год-неделя)
-            for col in df.columns:
-                col_lower = str(col).lower()
-                if 'год' in col_lower and ('месяц' in col_lower or 'неделя' in col_lower or 'неделя' in col_lower):
-                    year_month_col = col
-                    break
-            
-            # Ищем столбец с кодом клиента
-            for col in df.columns:
-                col_lower = str(col).lower()
-                if 'код' in col_lower and 'клиент' in col_lower:
-                    client_col = col
-                    break
-            
-            # Если столбцы не найдены, показываем ошибку
-            if year_month_col is None:
-                st.error("❌ Не найден столбец с периодом (Год-месяц или Год-Неделя). Убедитесь, что в файле есть столбец с названием, содержащим 'Год' и 'месяц' или 'неделя'.")
-                st.stop()
-            
-            if client_col is None:
-                st.error("❌ Не найден столбец с кодом клиента. Убедитесь, что в файле есть столбец с названием, содержащим 'Код' и 'клиент'.")
-                st.stop()
-            
-            # Сохраняем выбранные столбцы в session state
-            st.session_state.year_month_col = year_month_col
-            st.session_state.client_col = client_col
-            
-            # Построение матрицы
-            if year_month_col and client_col:
-                try:
-                    # Проверяем, есть ли уже вычисленные данные
-                    need_recompute = (
-                        st.session_state.cohort_matrix is None or
-                        st.session_state.sorted_periods is None or
-                        st.session_state.year_month_col != year_month_col or
-                        st.session_state.client_col != client_col
-                    )
-                    
-                    # Создаём контейнер для всего контента
-                    content_placeholder = st.empty()
-                    
-                    if need_recompute:
-                        # Единый спиннер для всех расчётов - показываем только его
-                        with content_placeholder.container():
-                            with st.spinner("Расчёт и анализ данных..."):
-                                # Построение когортной матрицы
-                                cohort_matrix, sorted_periods = build_cohort_matrix(
-                                    df, 
-                                    year_month_col, 
-                                    client_col, 
-                                    value_type='clients'
-                                )
-                                st.session_state.cohort_matrix = cohort_matrix
-                                st.session_state.sorted_periods = sorted_periods
-                                
-                                # Кэшируем множества клиентов по периодам для быстрого доступа в функциях получения клиентов
-                                period_clients_cache = {}
-                                for period in sorted_periods:
-                                    period_data = df[df[year_month_col] == period]
-                                    period_clients_cache[period] = set(period_data[client_col].dropna().unique())
-                                st.session_state.period_clients_cache = period_clients_cache
-                                
-                                # Вычисляем статистику по диагонали (количество клиентов в каждом периоде)
-                                diagonal_values = {period: cohort_matrix.loc[period, period] for period in sorted_periods}
-                                
-                                # Находим максимум и минимум
-                                max_clients = max(diagonal_values.values())
-                                min_clients = min(diagonal_values.values())
-                                max_period = [period for period, val in diagonal_values.items() if val == max_clients][0]
-                                min_period = [period for period, val in diagonal_values.items() if val == min_clients][0]
-                                
-                                # Первый и последний период
-                                first_period = sorted_periods[0]
-                                last_period = sorted_periods[-1]
-                                
-                                # Сохраняем информацию в session state для отображения в правой колонке
-                                st.session_state.cohort_info = {
-                                    'num_periods': len(sorted_periods),
-                                    'first_period': first_period,
-                                    'last_period': last_period,
-                                    'max_clients': max_clients,
-                                    'max_period': max_period,
-                                    'min_clients': min_clients,
-                                    'min_period': min_period
-                                }
-                                
-                                # Построение всех остальных матриц внутри спиннера
-                                st.session_state.accumulation_matrix = build_accumulation_matrix(df, year_month_col, client_col, sorted_periods)
-                                st.session_state.accumulation_percent_matrix = build_accumulation_percent_matrix(st.session_state.accumulation_matrix, cohort_matrix)
-                                st.session_state.inflow_matrix = build_inflow_matrix(st.session_state.accumulation_percent_matrix)
-                                st.session_state.churn_table = build_churn_table(df, year_month_col, client_col, sorted_periods, cohort_matrix, st.session_state.accumulation_matrix, st.session_state.accumulation_percent_matrix)
-                                
-                                # Кэшируем множества клиентов по периодам для быстрого доступа в функциях получения клиентов
-                                period_clients_cache = {}
-                                for period in sorted_periods:
-                                    period_data = df[df[year_month_col] == period]
-                                    period_clients_cache[period] = set(period_data[client_col].dropna().unique())
-                                st.session_state.period_clients_cache = period_clients_cache
-                        
-                        # После завершения всех расчётов очищаем placeholder и отображаем весь контент
-                        content_placeholder.empty()
-                    else:
-                        # Используем сохраненные данные
-                        cohort_matrix = st.session_state.cohort_matrix
-                        sorted_periods = st.session_state.sorted_periods
-                        # Проверяем наличие остальных матриц
-                        if st.session_state.get('accumulation_matrix') is None:
-                            st.session_state.accumulation_matrix = build_accumulation_matrix(df, year_month_col, client_col, sorted_periods)
-                        if st.session_state.get('accumulation_percent_matrix') is None:
-                            st.session_state.accumulation_percent_matrix = build_accumulation_percent_matrix(st.session_state.accumulation_matrix, cohort_matrix)
-                        if st.session_state.get('inflow_matrix') is None:
-                            st.session_state.inflow_matrix = build_inflow_matrix(st.session_state.accumulation_percent_matrix)
-                        if st.session_state.get('churn_table') is None:
-                            st.session_state.churn_table = build_churn_table(df, year_month_col, client_col, sorted_periods, cohort_matrix, st.session_state.accumulation_matrix, st.session_state.accumulation_percent_matrix)
-                        
-                        # Создаем кэш множеств клиентов, если его еще нет
-                        if st.session_state.get('period_clients_cache') is None:
+    try:
+        # Загрузка Excel файла
+        if uploaded_file.name.endswith('.xlsx'):
+            df = pd.read_excel(uploaded_file, engine='openpyxl')
+        else:
+            df = pd.read_excel(uploaded_file, engine='xlrd')
+        
+        # Сохранение данных в session state
+        # Проверяем, новый ли это файл
+        is_new_file = (
+            st.session_state.uploaded_data is None or 
+            st.session_state.uploaded_data.name != uploaded_file.name
+        )
+        
+        st.session_state.uploaded_data = uploaded_file
+        st.session_state.df = df
+        
+        # Очищаем старую информацию только при загрузке нового файла
+        if is_new_file:
+            st.session_state.cohort_info = None
+            st.session_state.cohort_matrix = None
+            st.session_state.sorted_periods = None
+            st.session_state.year_month_col = None
+            st.session_state.client_col = None
+        
+        # Построение когортной матрицы
+        st.markdown("---")
+        
+        # Определяем столбцы автоматически
+        expected_columns = {
+            'Год-месяц': 'Год-месяц',
+            'Год-Неделя': 'Год-Неделя',
+            'Год-неделя': 'Год-неделя',
+            'Год-Месяц': 'Год-Месяц',
+            'Код клиента': 'Код клиента'
+        }
+        
+        # Проверяем наличие ожидаемых столбцов
+        year_month_col = None
+        client_col = None
+        
+        # Ищем столбец с периодом (год-месяц или год-неделя)
+        for col in df.columns:
+            col_lower = str(col).lower()
+            if 'год' in col_lower and ('месяц' in col_lower or 'неделя' in col_lower or 'неделя' in col_lower):
+                year_month_col = col
+                break
+        
+        # Ищем столбец с кодом клиента
+        for col in df.columns:
+            col_lower = str(col).lower()
+            if 'код' in col_lower and 'клиент' in col_lower:
+                client_col = col
+                break
+        
+        # Если столбцы не найдены, показываем ошибку
+        if year_month_col is None:
+            st.error("❌ Не найден столбец с периодом (Год-месяц или Год-Неделя). Убедитесь, что в файле есть столбец с названием, содержащим 'Год' и 'месяц' или 'неделя'.")
+            st.stop()
+        
+        if client_col is None:
+            st.error("❌ Не найден столбец с кодом клиента. Убедитесь, что в файле есть столбец с названием, содержащим 'Код' и 'клиент'.")
+            st.stop()
+        
+        # Сохраняем выбранные столбцы в session state
+        st.session_state.year_month_col = year_month_col
+        st.session_state.client_col = client_col
+        
+        # Построение матрицы
+        if year_month_col and client_col:
+            try:
+                # Проверяем, есть ли уже вычисленные данные
+                need_recompute = (
+                    st.session_state.cohort_matrix is None or
+                    st.session_state.sorted_periods is None or
+                    st.session_state.year_month_col != year_month_col or
+                    st.session_state.client_col != client_col
+                )
+                
+                # Создаём контейнер для всего контента
+                content_placeholder = st.empty()
+                
+                if need_recompute:
+                    # Единый спиннер для всех расчётов - показываем только его
+                    with content_placeholder.container():
+                        with st.spinner("Расчёт и анализ данных..."):
+                            # Построение когортной матрицы
+                            cohort_matrix, sorted_periods = build_cohort_matrix(
+                                df, 
+                                year_month_col, 
+                                client_col, 
+                                value_type='clients'
+                            )
+                            st.session_state.cohort_matrix = cohort_matrix
+                            st.session_state.sorted_periods = sorted_periods
+                            
+                            # Кэшируем множества клиентов по периодам для быстрого доступа в функциях получения клиентов
                             period_clients_cache = {}
                             for period in sorted_periods:
                                 period_data = df[df[year_month_col] == period]
                                 period_clients_cache[period] = set(period_data[client_col].dropna().unique())
                             st.session_state.period_clients_cache = period_clients_cache
-                        
-                        # Получаем информацию из session state
-                        info = st.session_state.cohort_info
-                        
-                        # Отображаем кнопки скачивания под блоком загрузки (горизонтально)
-                        st.markdown("---")
-                        if info:
-                            # Создаем функцию для генерации полного отчёта
-                            def create_full_report_excel():
-                                """Создает полный Excel отчёт со всеми таблицами"""
-                                buffer = io.BytesIO()
-                                
-                                # Получаем данные из session state
-                                cohort_matrix = st.session_state.cohort_matrix
-                                sorted_periods = st.session_state.sorted_periods
                             
-                                with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
-                                    workbook = writer.book
-                                    
-                                    # Получаем все матрицы
-                                    accumulation_matrix = build_accumulation_matrix(df, year_month_col, client_col, sorted_periods)
-                                    accumulation_percent_matrix = build_accumulation_percent_matrix(accumulation_matrix, cohort_matrix)
-                                    inflow_matrix = build_inflow_matrix(accumulation_percent_matrix)
-                                    
-                                    # Таблица 1: Динамика уникальных клиентов когорт
-                                    cohort_matrix_copy = cohort_matrix.copy()
-                                    cohort_matrix_copy.index.name = 'Когорта / Период'
-                                    cohort_matrix_copy.to_excel(writer, sheet_name="1. Динамика уникальных клиентов", startrow=0, index=True)
-                                    worksheet1 = writer.sheets["1. Динамика уникальных клиентов"]
-                                    # Используем специальное форматирование с горизонтальной динамикой
-                                    apply_excel_cohort_formatting(worksheet1, cohort_matrix.astype(float), sorted_periods)
-                                    
-                                    # Таблица 2: Динамика накопления возврата
-                                    accumulation_matrix_copy = accumulation_matrix.copy()
-                                    accumulation_matrix_copy.index.name = 'Когорта / Период'
-                                    accumulation_matrix_copy.to_excel(writer, sheet_name="2. Динамика накопления", startrow=0, index=True)
-                                    worksheet2 = writer.sheets["2. Динамика накопления"]
-                                    # Применяем форматирование со скрытием нулевых значений
-                                    apply_excel_color_formatting(worksheet2, accumulation_matrix.astype(float), hide_zeros=True)
-                                    # Форматируем значения как целые числа (только для непустых ячеек)
-                                    for row_idx in range(2, len(accumulation_matrix.index) + 2):
-                                        for col_idx in range(2, len(accumulation_matrix.columns) + 2):
-                                            cell = worksheet2.cell(row=row_idx, column=col_idx)
-                                            if cell.value is not None and not isinstance(cell.value, str) and cell.value != "":
+                            # Вычисляем статистику по диагонали (количество клиентов в каждом периоде)
+                            diagonal_values = {period: cohort_matrix.loc[period, period] for period in sorted_periods}
+                            
+                            # Находим максимум и минимум
+                            max_clients = max(diagonal_values.values())
+                            min_clients = min(diagonal_values.values())
+                            max_period = [period for period, val in diagonal_values.items() if val == max_clients][0]
+                            min_period = [period for period, val in diagonal_values.items() if val == min_clients][0]
+                            
+                            # Первый и последний период
+                            first_period = sorted_periods[0]
+                            last_period = sorted_periods[-1]
+                            
+                            # Сохраняем информацию в session state для отображения в правой колонке
+                            st.session_state.cohort_info = {
+                                'num_periods': len(sorted_periods),
+                                'first_period': first_period,
+                                'last_period': last_period,
+                                'max_clients': max_clients,
+                                'max_period': max_period,
+                                'min_clients': min_clients,
+                                'min_period': min_period
+                            }
+                            
+                            # Построение всех остальных матриц внутри спиннера
+                            st.session_state.accumulation_matrix = build_accumulation_matrix(df, year_month_col, client_col, sorted_periods)
+                            st.session_state.accumulation_percent_matrix = build_accumulation_percent_matrix(st.session_state.accumulation_matrix, cohort_matrix)
+                            st.session_state.inflow_matrix = build_inflow_matrix(st.session_state.accumulation_percent_matrix)
+                            st.session_state.churn_table = build_churn_table(df, year_month_col, client_col, sorted_periods, cohort_matrix, st.session_state.accumulation_matrix, st.session_state.accumulation_percent_matrix)
+                            
+                            # Кэшируем множества клиентов по периодам для быстрого доступа в функциях получения клиентов
+                            period_clients_cache = {}
+                            for period in sorted_periods:
+                                period_data = df[df[year_month_col] == period]
+                                period_clients_cache[period] = set(period_data[client_col].dropna().unique())
+                            st.session_state.period_clients_cache = period_clients_cache
+                    
+                    # После завершения всех расчётов очищаем placeholder и отображаем весь контент
+                    content_placeholder.empty()
+                else:
+                    # Используем сохраненные данные
+                    cohort_matrix = st.session_state.cohort_matrix
+                    sorted_periods = st.session_state.sorted_periods
+                    # Проверяем наличие остальных матриц
+                    if st.session_state.get('accumulation_matrix') is None:
+                        st.session_state.accumulation_matrix = build_accumulation_matrix(df, year_month_col, client_col, sorted_periods)
+                    if st.session_state.get('accumulation_percent_matrix') is None:
+                        st.session_state.accumulation_percent_matrix = build_accumulation_percent_matrix(st.session_state.accumulation_matrix, cohort_matrix)
+                    if st.session_state.get('inflow_matrix') is None:
+                        st.session_state.inflow_matrix = build_inflow_matrix(st.session_state.accumulation_percent_matrix)
+                    if st.session_state.get('churn_table') is None:
+                        st.session_state.churn_table = build_churn_table(df, year_month_col, client_col, sorted_periods, cohort_matrix, st.session_state.accumulation_matrix, st.session_state.accumulation_percent_matrix)
+                    
+                    # Создаем кэш множеств клиентов, если его еще нет
+                    if st.session_state.get('period_clients_cache') is None:
+                        period_clients_cache = {}
+                        for period in sorted_periods:
+                            period_data = df[df[year_month_col] == period]
+                            period_clients_cache[period] = set(period_data[client_col].dropna().unique())
+                        st.session_state.period_clients_cache = period_clients_cache
+                
+                # Получаем информацию из session state
+                info = st.session_state.cohort_info
+                
+                # Отображаем кнопки скачивания под блоком загрузки (горизонтально)
+                st.markdown("---")
+                if info:
+                        # Создаем функцию для генерации полного отчёта
+                        def create_full_report_excel():
+                            """Создает полный Excel отчёт со всеми таблицами"""
+                            buffer = io.BytesIO()
+                            
+                            # Получаем данные из session state
+                            cohort_matrix = st.session_state.cohort_matrix
+                            sorted_periods = st.session_state.sorted_periods
+                        
+                            with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
+                                workbook = writer.book
+                                
+                                # Получаем все матрицы
+                                accumulation_matrix = build_accumulation_matrix(df, year_month_col, client_col, sorted_periods)
+                                accumulation_percent_matrix = build_accumulation_percent_matrix(accumulation_matrix, cohort_matrix)
+                                inflow_matrix = build_inflow_matrix(accumulation_percent_matrix)
+                                
+                                # Таблица 1: Динамика уникальных клиентов когорт
+                                cohort_matrix_copy = cohort_matrix.copy()
+                                cohort_matrix_copy.index.name = 'Когорта / Период'
+                                cohort_matrix_copy.to_excel(writer, sheet_name="1. Динамика уникальных клиентов", startrow=0, index=True)
+                                worksheet1 = writer.sheets["1. Динамика уникальных клиентов"]
+                                # Используем специальное форматирование с горизонтальной динамикой
+                                apply_excel_cohort_formatting(worksheet1, cohort_matrix.astype(float), sorted_periods)
+                                
+                                # Таблица 2: Динамика накопления возврата
+                                accumulation_matrix_copy = accumulation_matrix.copy()
+                                accumulation_matrix_copy.index.name = 'Когорта / Период'
+                                accumulation_matrix_copy.to_excel(writer, sheet_name="2. Динамика накопления", startrow=0, index=True)
+                                worksheet2 = writer.sheets["2. Динамика накопления"]
+                                # Применяем форматирование со скрытием нулевых значений
+                                apply_excel_color_formatting(worksheet2, accumulation_matrix.astype(float), hide_zeros=True)
+                                # Форматируем значения как целые числа (только для непустых ячеек)
+                                for row_idx in range(2, len(accumulation_matrix.index) + 2):
+                                    for col_idx in range(2, len(accumulation_matrix.columns) + 2):
+                                        cell = worksheet2.cell(row=row_idx, column=col_idx)
+                                        if cell.value is not None and not isinstance(cell.value, str) and cell.value != "":
+                                            cell.number_format = '0'  # Формат целого числа
+                                
+                                # Таблица 3: Динамика накопления возврата в %
+                                accumulation_percent_matrix_copy = accumulation_percent_matrix.copy()
+                                accumulation_percent_matrix_copy.index.name = 'Когорта / Период'
+                                accumulation_percent_matrix_copy.to_excel(writer, sheet_name="3. Динамика накопления %", startrow=0, index=True)
+                                worksheet3 = writer.sheets["3. Динамика накопления %"]
+                                # Используем специальное форматирование для процентов
+                                apply_excel_percent_formatting(worksheet3, accumulation_percent_matrix, sorted_periods)
+                                
+                                # Таблица 4: Приток возврата в %
+                                inflow_matrix_copy = inflow_matrix.copy()
+                                inflow_matrix_copy.index.name = 'Когорта / Период'
+                                inflow_matrix_copy.to_excel(writer, sheet_name="4. Приток возврата %", startrow=0, index=True)
+                                worksheet4 = writer.sheets["4. Приток возврата %"]
+                                # Используем специальное форматирование для процентов притока
+                                apply_excel_inflow_formatting(worksheet4, inflow_matrix, sorted_periods)
+                                
+                                # Таблица 5: Отток клиентов
+                                churn_table_full = build_churn_table(df, year_month_col, client_col, sorted_periods, cohort_matrix, accumulation_matrix, accumulation_percent_matrix)
+                                churn_table_copy = churn_table_full.copy()
+                                # Не конвертируем проценты в строки - сохраняем как числа для возможности расчетов
+                                churn_table_copy.to_excel(writer, sheet_name="5. Отток клиентов", startrow=0, index=False)
+                                worksheet5 = writer.sheets["5. Отток клиентов"]
+                                # Форматируем значения: числа как целые, проценты как проценты
+                                from openpyxl.styles import Alignment as ExcelAlignment
+                                for row_idx in range(2, len(churn_table_copy) + 2):
+                                    for col_idx in range(1, len(churn_table_copy.columns) + 1):
+                                        cell = worksheet5.cell(row=row_idx, column=col_idx)
+                                        cell.alignment = ExcelAlignment(horizontal="center", vertical="center")
+                                        col_name = churn_table_copy.columns[col_idx - 1]
+                                        if col_name in ['Кол-во клиентов когорты', 'Накопительное кол-во возврата', 'Отток кол-во']:
+                                            # Колонки с числами
+                                            if cell.value is not None and not isinstance(cell.value, str):
                                                 cell.number_format = '0'  # Формат целого числа
+                                        elif col_name in ['Накопительный % возврата', 'Отток %']:
+                                            # Колонки с процентами - сохраняем как число (уже в процентах, конвертируем в долю)
+                                            if cell.value is not None and not isinstance(cell.value, str):
+                                                # Значение уже в процентах (например, 45.7), конвертируем в долю (0.457)
+                                                cell.value = float(cell.value) / 100.0
+                                                cell.number_format = '0.0%'  # Процентный формат Excel
+                                
+                                # Таблица 6: Присутствие клиентов оттока когорты в других категориях товаров (объединённая таблица)
+                                if ('category_summary_table' in st.session_state and st.session_state.category_summary_table is not None) or \
+                                   ('category_cohort_table' in st.session_state and st.session_state.category_cohort_table is not None):
                                     
-                                    # Таблица 3: Динамика накопления возврата в %
-                                    accumulation_percent_matrix_copy = accumulation_percent_matrix.copy()
-                                    accumulation_percent_matrix_copy.index.name = 'Когорта / Период'
-                                    accumulation_percent_matrix_copy.to_excel(writer, sheet_name="3. Динамика накопления %", startrow=0, index=True)
-                                    worksheet3 = writer.sheets["3. Динамика накопления %"]
-                                    # Используем специальное форматирование для процентов
-                                    apply_excel_percent_formatting(worksheet3, accumulation_percent_matrix, sorted_periods)
+                                    start_row = 0
+                                    worksheet_combined = None
                                     
-                                    # Таблица 4: Приток возврата в %
-                                    inflow_matrix_copy = inflow_matrix.copy()
-                                    inflow_matrix_copy.index.name = 'Когорта / Период'
-                                    inflow_matrix_copy.to_excel(writer, sheet_name="4. Приток возврата %", startrow=0, index=True)
-                                    worksheet4 = writer.sheets["4. Приток возврата %"]
-                                    # Используем специальное форматирование для процентов притока
-                                    apply_excel_inflow_formatting(worksheet4, inflow_matrix, sorted_periods)
+                                    # Добавляем верхнюю таблицу с итоговыми метриками
+                                    if 'category_summary_table' in st.session_state and st.session_state.category_summary_table is not None:
+                                        summary_table_excel = st.session_state.category_summary_table.copy()
+                                        summary_table_excel.index.name = 'Метрика / Когорта'
+                                        summary_table_excel.to_excel(writer, sheet_name="6. Присутствие в других категориях", startrow=start_row, index=True)
+                                        worksheet_combined = writer.sheets["6. Присутствие в других категориях"]
+                                        
+                                        # Форматируем верхнюю таблицу
+                                        for row_idx in range(start_row + 2, start_row + len(summary_table_excel.index) + 2):
+                                            for col_idx in range(2, len(summary_table_excel.columns) + 2):
+                                                cell = worksheet_combined.cell(row=row_idx, column=col_idx)
+                                                cell.alignment = ExcelAlignment(horizontal="center", vertical="center")
+                                                row_name = summary_table_excel.index[row_idx - start_row - 2]
+                                                
+                                                if cell.value is not None and not isinstance(cell.value, str):
+                                                    if row_name == 'Доля оттока из сети от когорты':
+                                                        # Процентная колонка - конвертируем из процентов в долю
+                                                        cell.value = float(cell.value) / 100.0
+                                                        cell.number_format = '0.0%'
+                                                    else:
+                                                        # Числовые колонки
+                                                        cell.number_format = '0'  # Формат целого числа
+                                        
+                                        # Форматируем заголовок строки верхней таблицы
+                                        for row_idx in range(start_row + 2, start_row + len(summary_table_excel.index) + 2):
+                                            cell = worksheet_combined.cell(row=row_idx, column=1)
+                                            cell.alignment = ExcelAlignment(horizontal="left", vertical="center")
+                                        
+                                        # Обновляем начальную строку для следующей таблицы (верхняя таблица + 2 пустые строки)
+                                        start_row = start_row + len(summary_table_excel.index) + 3
                                     
-                                    # Таблица 5: Отток клиентов
-                                    churn_table_full = build_churn_table(df, year_month_col, client_col, sorted_periods, cohort_matrix, accumulation_matrix, accumulation_percent_matrix)
-                                    churn_table_copy = churn_table_full.copy()
-                                    # Не конвертируем проценты в строки - сохраняем как числа для возможности расчетов
-                                    churn_table_copy.to_excel(writer, sheet_name="5. Отток клиентов", startrow=0, index=False)
-                                    worksheet5 = writer.sheets["5. Отток клиентов"]
-                                    # Форматируем значения: числа как целые, проценты как проценты
-                                    from openpyxl.styles import Alignment as ExcelAlignment
-                                    for row_idx in range(2, len(churn_table_copy) + 2):
-                                        for col_idx in range(1, len(churn_table_copy.columns) + 1):
-                                            cell = worksheet5.cell(row=row_idx, column=col_idx)
-                                            cell.alignment = ExcelAlignment(horizontal="center", vertical="center")
-                                            col_name = churn_table_copy.columns[col_idx - 1]
-                                            if col_name in ['Кол-во клиентов когорты', 'Накопительное кол-во возврата', 'Отток кол-во']:
-                                                # Колонки с числами
+                                    # Добавляем таблицу с разрезом по категориям
+                                    if 'category_cohort_table' in st.session_state and st.session_state.category_cohort_table is not None:
+                                        category_table_excel = st.session_state.category_cohort_table.copy()
+                                        category_table_excel.index.name = 'Категория / Когорта'
+                                        
+                                        if worksheet_combined is None:
+                                            # Если верхней таблицы не было, создаём новый лист
+                                            category_table_excel.to_excel(writer, sheet_name="6. Присутствие в других категориях", startrow=start_row, index=True)
+                                            worksheet_combined = writer.sheets["6. Присутствие в других категориях"]
+                                        else:
+                                            # Записываем вторую таблицу на тот же лист
+                                            category_table_excel.to_excel(writer, sheet_name="6. Присутствие в других категориях", startrow=start_row, index=True)
+                                        
+                                        # Форматируем таблицу с категориями
+                                        for row_idx in range(start_row + 2, start_row + len(category_table_excel.index) + 2):
+                                            for col_idx in range(2, len(category_table_excel.columns) + 2):
+                                                cell = worksheet_combined.cell(row=row_idx, column=col_idx)
+                                                cell.alignment = ExcelAlignment(horizontal="center", vertical="center")
                                                 if cell.value is not None and not isinstance(cell.value, str):
                                                     cell.number_format = '0'  # Формат целого числа
-                                            elif col_name in ['Накопительный % возврата', 'Отток %']:
-                                                # Колонки с процентами - сохраняем как число (уже в процентах, конвертируем в долю)
-                                                if cell.value is not None and not isinstance(cell.value, str):
-                                                    # Значение уже в процентах (например, 45.7), конвертируем в долю (0.457)
-                                                    cell.value = float(cell.value) / 100.0
-                                                    cell.number_format = '0.0%'  # Процентный формат Excel
-                                    
-                                    # Таблица 6: Присутствие клиентов оттока когорты в других категориях товаров (объединённая таблица)
-                                    if ('category_summary_table' in st.session_state and st.session_state.category_summary_table is not None) or \
-                                       ('category_cohort_table' in st.session_state and st.session_state.category_cohort_table is not None):
                                         
-                                        start_row = 0
-                                        worksheet_combined = None
-                                        
-                                        # Добавляем верхнюю таблицу с итоговыми метриками
-                                        if 'category_summary_table' in st.session_state and st.session_state.category_summary_table is not None:
-                                            summary_table_excel = st.session_state.category_summary_table.copy()
-                                            summary_table_excel.index.name = 'Метрика / Когорта'
-                                            summary_table_excel.to_excel(writer, sheet_name="6. Присутствие в других категориях", startrow=start_row, index=True)
-                                            worksheet_combined = writer.sheets["6. Присутствие в других категориях"]
-                                            
-                                            # Форматируем верхнюю таблицу
-                                            for row_idx in range(start_row + 2, start_row + len(summary_table_excel.index) + 2):
-                                                for col_idx in range(2, len(summary_table_excel.columns) + 2):
-                                                    cell = worksheet_combined.cell(row=row_idx, column=col_idx)
-                                                    cell.alignment = ExcelAlignment(horizontal="center", vertical="center")
-                                                    row_name = summary_table_excel.index[row_idx - start_row - 2]
-                                                    
-                                                    if cell.value is not None and not isinstance(cell.value, str):
-                                                        if row_name == 'Доля оттока из сети от когорты':
-                                                            # Процентная колонка - конвертируем из процентов в долю
-                                                            cell.value = float(cell.value) / 100.0
-                                                            cell.number_format = '0.0%'
-                                                        else:
-                                                            # Числовые колонки
-                                                            cell.number_format = '0'  # Формат целого числа
-                                            
-                                            # Форматируем заголовок строки верхней таблицы
-                                            for row_idx in range(start_row + 2, start_row + len(summary_table_excel.index) + 2):
-                                                cell = worksheet_combined.cell(row=row_idx, column=1)
-                                                cell.alignment = ExcelAlignment(horizontal="left", vertical="center")
-                                            
-                                            # Обновляем начальную строку для следующей таблицы (верхняя таблица + 2 пустые строки)
-                                            start_row = start_row + len(summary_table_excel.index) + 3
-                                        
-                                        # Добавляем таблицу с разрезом по категориям
-                                        if 'category_cohort_table' in st.session_state and st.session_state.category_cohort_table is not None:
-                                            category_table_excel = st.session_state.category_cohort_table.copy()
-                                            category_table_excel.index.name = 'Категория / Когорта'
-                                            
-                                            if worksheet_combined is None:
-                                                # Если верхней таблицы не было, создаём новый лист
-                                                category_table_excel.to_excel(writer, sheet_name="6. Присутствие в других категориях", startrow=start_row, index=True)
-                                                worksheet_combined = writer.sheets["6. Присутствие в других категориях"]
-                                            else:
-                                                # Записываем вторую таблицу на тот же лист
-                                                category_table_excel.to_excel(writer, sheet_name="6. Присутствие в других категориях", startrow=start_row, index=True)
-                                            
-                                            # Форматируем таблицу с категориями
-                                            for row_idx in range(start_row + 2, start_row + len(category_table_excel.index) + 2):
-                                                for col_idx in range(2, len(category_table_excel.columns) + 2):
-                                                    cell = worksheet_combined.cell(row=row_idx, column=col_idx)
-                                                    cell.alignment = ExcelAlignment(horizontal="center", vertical="center")
-                                                    if cell.value is not None and not isinstance(cell.value, str):
-                                                        cell.number_format = '0'  # Формат целого числа
-                                            
-                                            # Форматируем заголовок строки таблицы с категориями
-                                            for row_idx in range(start_row + 2, start_row + len(category_table_excel.index) + 2):
-                                                cell = worksheet_combined.cell(row=row_idx, column=1)
-                                                cell.alignment = ExcelAlignment(horizontal="left", vertical="center")
-                                    
-                                    # Удаляем пустой лист по умолчанию
-                                    if 'Sheet' in workbook.sheetnames:
-                                        workbook.remove(workbook['Sheet'])
+                                        # Форматируем заголовок строки таблицы с категориями
+                                        for row_idx in range(start_row + 2, start_row + len(category_table_excel.index) + 2):
+                                            cell = worksheet_combined.cell(row=row_idx, column=1)
+                                            cell.alignment = ExcelAlignment(horizontal="left", vertical="center")
                                 
-                                buffer.seek(0)
-                                return buffer.getvalue()
+                                # Удаляем пустой лист по умолчанию
+                                if 'Sheet' in workbook.sheetnames:
+                                    workbook.remove(workbook['Sheet'])
+                            
+                            buffer.seek(0)
+                            return buffer.getvalue()
                         
                         # CSS для увеличения размера кнопок загрузки
                         st.markdown("""
@@ -2081,16 +2081,16 @@ elif st.session_state.current_page == 'cohort':
                                 use_container_width=True,
                                 key="download_analysis_pdf"
                             )
-                        else:
-                            st.info("⏳ Загрузите файл и дождитесь завершения расчётов для генерации отчётов")
+                else:
+                    st.info("⏳ Загрузите файл и дождитесь завершения расчётов для генерации отчётов")
+                
+                # Отображение матрицы (только если данные готовы)
+                if info:
+                    st.markdown("---")
                     
-                    # Отображение матрицы (только если данные готовы)
-                    if info:
-                        st.markdown("---")
-                        
-                        # Добавляем CSS для компактного отображения таблицы без прокрутки
-                        st.markdown("""
-                        <style>
+                    # Добавляем CSS для компактного отображения таблицы без прокрутки
+                    st.markdown("""
+                    <style>
                     div[data-testid="stDataFrame"] > div {
                         overflow: visible !important;
                     }
@@ -2108,75 +2108,75 @@ elif st.session_state.current_page == 'cohort':
                     div[data-testid="stDataFrame"] table th,
                     div[data-testid="stDataFrame"] table td {
                         text-align: center !important;
-                        }
-                        </style>
-                        """, unsafe_allow_html=True)
+                    }
+                    </style>
+                    """, unsafe_allow_html=True)
+                    
+                    # Заголовок таблицы
+                    st.subheader("🔢 Динамика уникальных клиентов когорт")
+                    st.markdown("**Описание:** Диагональ показывает количество уникальных клиентов в каждом периоде. "
+                              "Пересечения показывают количество клиентов, которые были активны в обоих периодах.")
                         
-                        # Заголовок таблицы
-                        st.subheader("🔢 Динамика уникальных клиентов когорт")
-                        st.markdown("**Описание:** Диагональ показывает количество уникальных клиентов в каждом периоде. "
-                                  "Пересечения показывают количество клиентов, которые были активны в обоих периодах.")
-                            
-                        # Применяем цветовое форматирование
-                        # Преобразуем в int для отображения без десятичных знаков
-                        matrix_int = cohort_matrix.astype(int)
-                        styled_matrix = apply_matrix_color_gradient(matrix_int.astype(float), horizontal_dynamics=True, hide_before_diagonal=True)
+                    # Применяем цветовое форматирование
+                    # Преобразуем в int для отображения без десятичных знаков
+                    matrix_int = cohort_matrix.astype(int)
+                    styled_matrix = apply_matrix_color_gradient(matrix_int.astype(float), horizontal_dynamics=True, hide_before_diagonal=True)
+                    
+                    # Форматируем значения как целые числа
+                    styled_matrix = styled_matrix.format(precision=0, thousands=',', decimal='.')
+                    
+                    # Отображение матрицы с форматированием - без ограничений по размеру
+                    st.dataframe(
+                        styled_matrix,
+                        use_container_width=False
+                    )
+                    
+                    # Блок кодов клиентов для первой таблицы
+                    st.markdown("---")
+                    
+                    # Коды клиентов для первой таблицы
+                    with st.expander("👥 Коды клиентов: Динамика уникальных клиентов когорт", expanded=False):
+                        st.subheader("Выбор клиентов по когорте и периоду")
                         
-                        # Форматируем значения как целые числа
-                        styled_matrix = styled_matrix.format(precision=0, thousands=',', decimal='.')
+                        col_cohort1, col_period1 = st.columns(2)
                         
-                        # Отображение матрицы с форматированием - без ограничений по размеру
-                        st.dataframe(
-                            styled_matrix,
-                            use_container_width=False
-                        )
+                        with col_cohort1:
+                            selected_cohort1 = st.selectbox(
+                                "Выберите когорту:",
+                                options=sorted_periods,
+                                index=0,
+                                help="Выберите период, когда клиенты впервые появились",
+                                key="cohort_select_1"
+                            )
                         
-                        # Блок кодов клиентов для первой таблицы
-                        st.markdown("---")
+                        with col_period1:
+                            selected_period1 = st.selectbox(
+                                "Выберите период:",
+                                options=sorted_periods,
+                                index=min(1, len(sorted_periods) - 1) if len(sorted_periods) > 1 else 0,
+                                help="Выберите период, для которого нужно показать клиентов",
+                                key="period_select_1"
+                            )
                         
-                        # Коды клиентов для первой таблицы
-                        with st.expander("👥 Коды клиентов: Динамика уникальных клиентов когорт", expanded=False):
-                            st.subheader("Выбор клиентов по когорте и периоду")
+                        if selected_cohort1 and selected_period1:
+                            period_clients_cache = st.session_state.get('period_clients_cache', None)
+                            common_clients = get_cohort_clients(df, year_month_col, client_col, selected_cohort1, selected_period1, period_clients_cache)
                             
-                            col_cohort1, col_period1 = st.columns(2)
-                            
-                            with col_cohort1:
-                                selected_cohort1 = st.selectbox(
-                                    "Выберите когорту:",
-                                    options=sorted_periods,
-                                    index=0,
-                                    help="Выберите период, когда клиенты впервые появились",
-                                    key="cohort_select_1"
-                                )
-                            
-                            with col_period1:
-                                selected_period1 = st.selectbox(
-                                    "Выберите период:",
-                                    options=sorted_periods,
-                                    index=min(1, len(sorted_periods) - 1) if len(sorted_periods) > 1 else 0,
-                                    help="Выберите период, для которого нужно показать клиентов",
-                                    key="period_select_1"
-                                )
-                            
-                            if selected_cohort1 and selected_period1:
-                                period_clients_cache = st.session_state.get('period_clients_cache', None)
-                                common_clients = get_cohort_clients(df, year_month_col, client_col, selected_cohort1, selected_period1, period_clients_cache)
+                            if common_clients:
+                                st.write(f"**Найдено клиентов: {len(common_clients)}**")
                                 
-                                if common_clients:
-                                    st.write(f"**Найдено клиентов: {len(common_clients)}**")
-                                    
-                                    # Возможность скачать список
-                                    clients_csv = "\n".join([str(client) for client in common_clients])
-                                    st.download_button(
-                                        label=f"💾 Скачать список клиентов ({len(common_clients)} шт.)",
-                                        data=clients_csv,
-                                        file_name=f"клиенты_когорта_{selected_cohort1}_период_{selected_period1}.txt",
-                                        mime="text/plain",
-                                        use_container_width=True,
-                                        key="download_clients_1"
-                                    )
-                                else:
-                                    st.info(f"❌ Нет клиентов когорты {selected_cohort1} в периоде {selected_period1}")
+                                # Возможность скачать список
+                                clients_csv = "\n".join([str(client) for client in common_clients])
+                                st.download_button(
+                                    label=f"💾 Скачать список клиентов ({len(common_clients)} шт.)",
+                                    data=clients_csv,
+                                    file_name=f"клиенты_когорта_{selected_cohort1}_период_{selected_period1}.txt",
+                                    mime="text/plain",
+                                    use_container_width=True,
+                                    key="download_clients_1"
+                                )
+                            else:
+                                st.info(f"❌ Нет клиентов когорты {selected_cohort1} в периоде {selected_period1}")
                     
                     # Вторая таблица - Динамика накопления возврата
                     st.markdown("---")
@@ -2860,14 +2860,13 @@ elif st.session_state.current_page == 'cohort':
                             st.error(f"❌ Ошибка при обработке файла: {str(e)}")
                             st.exception(e)
                     
-                except Exception as e:
-                    st.error(f"❌ Ошибка при построении матрицы: {str(e)}")
-                    st.exception(e)
-            else:
-                st.warning("⚠️ Необходимо указать столбцы для построения матрицы")
+            except Exception as e:
+                st.error(f"❌ Ошибка при построении матрицы: {str(e)}")
+                st.exception(e)
+        else:
+            st.warning("⚠️ Необходимо указать столбцы для построения матрицы")
             
-        except Exception as e:
-            st.error(f"❌ Ошибка при загрузке файла: {str(e)}")
-            st.session_state.uploaded_data = None
-            st.session_state.df = None
-
+    except Exception as e:
+        st.error(f"❌ Ошибка при загрузке файла: {str(e)}")
+        st.session_state.uploaded_data = None
+        st.session_state.df = None
