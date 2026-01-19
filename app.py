@@ -27,28 +27,15 @@ import os
 
 # Настройка страницы
 st.set_page_config(
-    page_title="Когортный анализ",
+    page_title="Меню инструментов клиентского анализа",
     page_icon="📊",
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="collapsed"
 )
 
-st.title("📊 Когортный анализ")
-st.markdown("---")
-
-# Глобальные CSS стили для всех таблиц (выравнивание по центру)
-st.markdown("""
-<style>
-div[data-testid="stDataFrame"] table,
-div[data-testid="stDataFrame"] table th,
-div[data-testid="stDataFrame"] table td {
-    text-align: center !important;
-}
-div[data-testid="stDataFrame"] th,
-div[data-testid="stDataFrame"] td {
-    text-align: center !important;
-}
-</style>
-""", unsafe_allow_html=True)
+# Инициализация session state для навигации
+if 'current_page' not in st.session_state:
+    st.session_state.current_page = 'menu'
 
 # Инициализация session state для хранения загруженных данных
 if 'uploaded_data' not in st.session_state:
@@ -65,6 +52,227 @@ if 'year_month_col' not in st.session_state:
     st.session_state.year_month_col = None
 if 'client_col' not in st.session_state:
     st.session_state.client_col = None
+
+# Apple-like стили
+st.markdown("""
+<style>
+    /* Основные стили Apple-like */
+    .main-menu-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-height: 80vh;
+        padding: 40px 20px;
+    }
+    
+    .menu-title {
+        font-size: 48px;
+        font-weight: 600;
+        color: #1d1d1f;
+        margin-bottom: 60px;
+        letter-spacing: -0.5px;
+        text-align: center;
+    }
+    
+    .menu-buttons-container {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+        width: 100%;
+        max-width: 500px;
+    }
+    
+    .menu-button {
+        background: linear-gradient(180deg, #ffffff 0%, #f5f5f7 100%);
+        border: 1px solid #d2d2d7;
+        border-radius: 18px;
+        padding: 32px 40px;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        text-decoration: none;
+        display: block;
+    }
+    
+    .menu-button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+        border-color: #007aff;
+    }
+    
+    .menu-button:active {
+        transform: translateY(0);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    }
+    
+    .menu-button-title {
+        font-size: 24px;
+        font-weight: 600;
+        color: #1d1d1f;
+        margin-bottom: 8px;
+        letter-spacing: -0.3px;
+    }
+    
+    .menu-button-subtitle {
+        font-size: 16px;
+        color: #86868b;
+        font-weight: 400;
+    }
+    
+    .back-button {
+        background: transparent;
+        border: 1px solid #d2d2d7;
+        border-radius: 12px;
+        padding: 12px 24px;
+        color: #007aff;
+        font-size: 16px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        margin-bottom: 30px;
+    }
+    
+    .back-button:hover {
+        background: #f5f5f7;
+        border-color: #007aff;
+    }
+    
+    /* Стили для таблиц */
+    div[data-testid="stDataFrame"] table,
+    div[data-testid="stDataFrame"] table th,
+    div[data-testid="stDataFrame"] table td {
+        text-align: center !important;
+    }
+    div[data-testid="stDataFrame"] th,
+    div[data-testid="stDataFrame"] td {
+        text-align: center !important;
+    }
+    
+    /* Стили для кнопок Streamlit в Apple-стиле */
+    .stButton > button {
+        background: linear-gradient(180deg, #007aff 0%, #0051d5 100%);
+        color: white;
+        border: none;
+        border-radius: 12px;
+        padding: 12px 24px;
+        font-size: 16px;
+        font-weight: 500;
+        transition: all 0.2s ease;
+        box-shadow: 0 2px 8px rgba(0, 122, 255, 0.3);
+    }
+    
+    .stButton > button:hover {
+        background: linear-gradient(180deg, #0051d5 0%, #003d9e 100%);
+        box-shadow: 0 4px 12px rgba(0, 122, 255, 0.4);
+        transform: translateY(-1px);
+    }
+    
+    .stButton > button:active {
+        transform: translateY(0);
+        box-shadow: 0 2px 8px rgba(0, 122, 255, 0.3);
+    }
+    
+    /* Стили для кнопки "Назад" */
+    button[key="back_from_cohort"],
+    button[key="back_from_contribution"] {
+        background: transparent !important;
+        color: #007aff !important;
+        border: 1px solid #d2d2d7 !important;
+        box-shadow: none !important;
+    }
+    
+    button[key="back_from_cohort"]:hover,
+    button[key="back_from_contribution"]:hover {
+        background: #f5f5f7 !important;
+        border-color: #007aff !important;
+    }
+    
+    /* Скрываем стандартные элементы Streamlit */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+</style>
+""", unsafe_allow_html=True)
+
+# Функция для отображения главного меню
+def show_main_menu():
+    st.markdown("""
+    <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 80vh; padding: 40px 20px;">
+        <h1 style="font-size: 48px; font-weight: 600; color: #1d1d1f; margin-bottom: 60px; letter-spacing: -0.5px; text-align: center;">
+            Меню инструментов<br>клиентского анализа
+        </h1>
+        <div style="display: flex; flex-direction: row; gap: 30px; width: 100%; max-width: 800px; justify-content: center; flex-wrap: wrap;">
+    """, unsafe_allow_html=True)
+    
+    col1, col2 = st.columns([1, 1])
+    
+    with col1:
+        st.markdown("""
+        <div style="background: linear-gradient(180deg, #ffffff 0%, #f5f5f7 100%); 
+                    border: 1px solid #d2d2d7; 
+                    border-radius: 18px; 
+                    padding: 40px 30px; 
+                    text-align: center; 
+                    cursor: pointer; 
+                    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); 
+                    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+                    min-height: 200px;
+                    display: flex;
+                    flex-direction: column;
+                    justify-content: center;">
+            <div style="font-size: 48px; margin-bottom: 20px;">📊</div>
+            <div style="font-size: 24px; font-weight: 600; color: #1d1d1f; margin-bottom: 12px; letter-spacing: -0.3px;">
+                Когортный анализ
+            </div>
+            <div style="font-size: 16px; color: #86868b; font-weight: 400;">
+                Анализ клиентских когорт
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        if st.button("Выбрать", use_container_width=True, key="btn_cohort"):
+            st.session_state.current_page = 'cohort'
+            st.rerun()
+    
+    with col2:
+        st.markdown("""
+        <div style="background: linear-gradient(180deg, #ffffff 0%, #f5f5f7 100%); 
+                    border: 1px solid #d2d2d7; 
+                    border-radius: 18px; 
+                    padding: 40px 30px; 
+                    text-align: center; 
+                    cursor: pointer; 
+                    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); 
+                    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+                    min-height: 200px;
+                    display: flex;
+                    flex-direction: column;
+                    justify-content: center;">
+            <div style="font-size: 48px; margin-bottom: 20px;">💼</div>
+            <div style="font-size: 24px; font-weight: 600; color: #1d1d1f; margin-bottom: 12px; letter-spacing: -0.3px;">
+                Вклад клиентов в период
+            </div>
+            <div style="font-size: 16px; color: #86868b; font-weight: 400;">
+                Анализ вклада клиентов
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        if st.button("Выбрать", use_container_width=True, key="btn_contribution"):
+            st.session_state.current_page = 'contribution'
+            st.rerun()
+    
+    st.markdown("</div></div>", unsafe_allow_html=True)
+
+# Функция для отображения страницы "Вклад клиентов в период"
+def show_contribution_page():
+    if st.button("← Назад в меню", key="back_from_contribution"):
+        st.session_state.current_page = 'menu'
+        st.rerun()
+    
+    st.title("💼 Вклад клиентов в период")
+    st.markdown("---")
+    st.info("🚧 Эта функция находится в разработке. Скоро здесь будет доступен анализ вклада клиентов в период.")
 
 # Функция для преобразования периода (месяц или неделя) в порядковый номер для сортировки
 def parse_period(period_str):
@@ -1059,8 +1267,22 @@ def build_accumulation_percent_matrix(accumulation_matrix, cohort_matrix):
     
     return matrix_percent
 
-# Функция загрузки Excel файла
-st.header("📁 Загрузка данных")
+# Основная логика приложения
+if st.session_state.current_page == 'menu':
+    show_main_menu()
+elif st.session_state.current_page == 'contribution':
+    show_contribution_page()
+elif st.session_state.current_page == 'cohort':
+    # Кнопка возврата в меню
+    if st.button("← Назад в меню", key="back_from_cohort"):
+        st.session_state.current_page = 'menu'
+        st.rerun()
+    
+    st.title("📊 Когортный анализ")
+    st.markdown("---")
+    
+    # Функция загрузки Excel файла
+    st.header("📁 Загрузка данных")
 
 # Блок шаблона Qlik - верхняя часть с двумя колонками
 col_template_instructions, col_template_image = st.columns([1, 1])
