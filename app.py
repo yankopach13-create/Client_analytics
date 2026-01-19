@@ -1504,6 +1504,27 @@ if uploaded_file is not None:
                                                 break
                                             except Exception as e:
                                                 continue
+                                elif platform.system() == 'Linux':
+                                    # Пути к стандартным шрифтам Linux с поддержкой кириллицы
+                                    linux_fonts = [
+                                        '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
+                                        '/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf',
+                                        '/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf',
+                                        '/usr/share/fonts/truetype/ttf-dejavu/DejaVuSans.ttf',
+                                        '/usr/share/fonts/TTF/DejaVuSans.ttf',
+                                    ]
+                                    
+                                    # Регистрируем первый доступный шрифт
+                                    for font_path in linux_fonts:
+                                        if os.path.exists(font_path):
+                                            try:
+                                                font_name = 'CyrillicFont'
+                                                font_name_bold = 'CyrillicFont-Bold'
+                                                pdfmetrics.registerFont(TTFont(font_name, font_path))
+                                                pdfmetrics.registerFont(TTFont(font_name_bold, font_path))
+                                                break
+                                            except Exception as e:
+                                                continue
                             except Exception as e:
                                 pass  # Используем стандартные шрифты в случае ошибки
                             
