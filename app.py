@@ -1451,65 +1451,65 @@ elif st.session_state.current_page == 'cohort':
                     content_placeholder = st.empty()
                     
                     if need_recompute:
-                    # Единый спиннер для всех расчётов - показываем только его
-                    with content_placeholder.container():
-                        with st.spinner("Расчёт и анализ данных..."):
-                            # Построение когортной матрицы
-                            cohort_matrix, sorted_periods = build_cohort_matrix(
-                                df, 
-                                year_month_col, 
-                                client_col, 
-                                value_type='clients'
-                            )
-                            st.session_state.cohort_matrix = cohort_matrix
-                            st.session_state.sorted_periods = sorted_periods
-                            
-                            # Кэшируем множества клиентов по периодам для быстрого доступа в функциях получения клиентов
-                            period_clients_cache = {}
-                            for period in sorted_periods:
-                                period_data = df[df[year_month_col] == period]
-                                period_clients_cache[period] = set(period_data[client_col].dropna().unique())
-                            st.session_state.period_clients_cache = period_clients_cache
-                            
-                            # Вычисляем статистику по диагонали (количество клиентов в каждом периоде)
-                            diagonal_values = {period: cohort_matrix.loc[period, period] for period in sorted_periods}
-                            
-                            # Находим максимум и минимум
-                            max_clients = max(diagonal_values.values())
-                            min_clients = min(diagonal_values.values())
-                            max_period = [period for period, val in diagonal_values.items() if val == max_clients][0]
-                            min_period = [period for period, val in diagonal_values.items() if val == min_clients][0]
-                            
-                            # Первый и последний период
-                            first_period = sorted_periods[0]
-                            last_period = sorted_periods[-1]
-                            
-                            # Сохраняем информацию в session state для отображения в правой колонке
-                            st.session_state.cohort_info = {
-                                'num_periods': len(sorted_periods),
-                                'first_period': first_period,
-                                'last_period': last_period,
-                                'max_clients': max_clients,
-                                'max_period': max_period,
-                                'min_clients': min_clients,
-                                'min_period': min_period
-                            }
-                            
-                            # Построение всех остальных матриц внутри спиннера
-                            st.session_state.accumulation_matrix = build_accumulation_matrix(df, year_month_col, client_col, sorted_periods)
-                            st.session_state.accumulation_percent_matrix = build_accumulation_percent_matrix(st.session_state.accumulation_matrix, cohort_matrix)
-                            st.session_state.inflow_matrix = build_inflow_matrix(st.session_state.accumulation_percent_matrix)
-                            st.session_state.churn_table = build_churn_table(df, year_month_col, client_col, sorted_periods, cohort_matrix, st.session_state.accumulation_matrix, st.session_state.accumulation_percent_matrix)
-                            
-                            # Кэшируем множества клиентов по периодам для быстрого доступа в функциях получения клиентов
-                            period_clients_cache = {}
-                            for period in sorted_periods:
-                                period_data = df[df[year_month_col] == period]
-                                period_clients_cache[period] = set(period_data[client_col].dropna().unique())
-                            st.session_state.period_clients_cache = period_clients_cache
-                    
-                    # После завершения всех расчётов очищаем placeholder и отображаем весь контент
-                    content_placeholder.empty()
+                        # Единый спиннер для всех расчётов - показываем только его
+                        with content_placeholder.container():
+                            with st.spinner("Расчёт и анализ данных..."):
+                                # Построение когортной матрицы
+                                cohort_matrix, sorted_periods = build_cohort_matrix(
+                                    df, 
+                                    year_month_col, 
+                                    client_col, 
+                                    value_type='clients'
+                                )
+                                st.session_state.cohort_matrix = cohort_matrix
+                                st.session_state.sorted_periods = sorted_periods
+                                
+                                # Кэшируем множества клиентов по периодам для быстрого доступа в функциях получения клиентов
+                                period_clients_cache = {}
+                                for period in sorted_periods:
+                                    period_data = df[df[year_month_col] == period]
+                                    period_clients_cache[period] = set(period_data[client_col].dropna().unique())
+                                st.session_state.period_clients_cache = period_clients_cache
+                                
+                                # Вычисляем статистику по диагонали (количество клиентов в каждом периоде)
+                                diagonal_values = {period: cohort_matrix.loc[period, period] for period in sorted_periods}
+                                
+                                # Находим максимум и минимум
+                                max_clients = max(diagonal_values.values())
+                                min_clients = min(diagonal_values.values())
+                                max_period = [period for period, val in diagonal_values.items() if val == max_clients][0]
+                                min_period = [period for period, val in diagonal_values.items() if val == min_clients][0]
+                                
+                                # Первый и последний период
+                                first_period = sorted_periods[0]
+                                last_period = sorted_periods[-1]
+                                
+                                # Сохраняем информацию в session state для отображения в правой колонке
+                                st.session_state.cohort_info = {
+                                    'num_periods': len(sorted_periods),
+                                    'first_period': first_period,
+                                    'last_period': last_period,
+                                    'max_clients': max_clients,
+                                    'max_period': max_period,
+                                    'min_clients': min_clients,
+                                    'min_period': min_period
+                                }
+                                
+                                # Построение всех остальных матриц внутри спиннера
+                                st.session_state.accumulation_matrix = build_accumulation_matrix(df, year_month_col, client_col, sorted_periods)
+                                st.session_state.accumulation_percent_matrix = build_accumulation_percent_matrix(st.session_state.accumulation_matrix, cohort_matrix)
+                                st.session_state.inflow_matrix = build_inflow_matrix(st.session_state.accumulation_percent_matrix)
+                                st.session_state.churn_table = build_churn_table(df, year_month_col, client_col, sorted_periods, cohort_matrix, st.session_state.accumulation_matrix, st.session_state.accumulation_percent_matrix)
+                                
+                                # Кэшируем множества клиентов по периодам для быстрого доступа в функциях получения клиентов
+                                period_clients_cache = {}
+                                for period in sorted_periods:
+                                    period_data = df[df[year_month_col] == period]
+                                    period_clients_cache[period] = set(period_data[client_col].dropna().unique())
+                                st.session_state.period_clients_cache = period_clients_cache
+                        
+                        # После завершения всех расчётов очищаем placeholder и отображаем весь контент
+                        content_placeholder.empty()
                 else:
                     # Используем сохраненные данные
                     cohort_matrix = st.session_state.cohort_matrix
