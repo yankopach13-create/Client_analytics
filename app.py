@@ -1368,84 +1368,84 @@ elif st.session_state.current_page == 'cohort':
     )
 
     if uploaded_file is not None:
-    try:
-        # Загрузка Excel файла
-        if uploaded_file.name.endswith('.xlsx'):
-            df = pd.read_excel(uploaded_file, engine='openpyxl')
-        else:
-            df = pd.read_excel(uploaded_file, engine='xlrd')
-        
-        # Сохранение данных в session state
-        # Проверяем, новый ли это файл
-        is_new_file = (
-            st.session_state.uploaded_data is None or 
-            st.session_state.uploaded_data.name != uploaded_file.name
-        )
-        
-        st.session_state.uploaded_data = uploaded_file
-        st.session_state.df = df
-        
-        # Очищаем старую информацию только при загрузке нового файла
-        if is_new_file:
-            st.session_state.cohort_info = None
-            st.session_state.cohort_matrix = None
-            st.session_state.sorted_periods = None
-            st.session_state.year_month_col = None
-            st.session_state.client_col = None
-        
-        # Построение когортной матрицы
-        st.markdown("---")
-        
-        # Определяем столбцы автоматически
-        expected_columns = {
-            'Год-месяц': 'Год-месяц',
-            'Год-Неделя': 'Год-Неделя',
-            'Год-неделя': 'Год-неделя',
-            'Год-Месяц': 'Год-Месяц',
-            'Код клиента': 'Код клиента'
-        }
-        
-        # Проверяем наличие ожидаемых столбцов
-        year_month_col = None
-        client_col = None
-        
-        # Ищем столбец с периодом (год-месяц или год-неделя)
-        for col in df.columns:
-            col_lower = str(col).lower()
-            if 'год' in col_lower and ('месяц' in col_lower or 'неделя' in col_lower or 'неделя' in col_lower):
-                year_month_col = col
-                break
-        
-        # Ищем столбец с кодом клиента
-        for col in df.columns:
-            col_lower = str(col).lower()
-            if 'код' in col_lower and 'клиент' in col_lower:
-                client_col = col
-                break
-        
-        # Если столбцы не найдены, показываем ошибку
-        if year_month_col is None:
-            st.error("❌ Не найден столбец с периодом (Год-месяц или Год-Неделя). Убедитесь, что в файле есть столбец с названием, содержащим 'Год' и 'месяц' или 'неделя'.")
-            st.stop()
-        
-        if client_col is None:
-            st.error("❌ Не найден столбец с кодом клиента. Убедитесь, что в файле есть столбец с названием, содержащим 'Код' и 'клиент'.")
-            st.stop()
-        
-        # Сохраняем выбранные столбцы в session state
-        st.session_state.year_month_col = year_month_col
-        st.session_state.client_col = client_col
-        
-        # Построение матрицы
-        if year_month_col and client_col:
-            try:
-                # Проверяем, есть ли уже вычисленные данные
-                need_recompute = (
-                    st.session_state.cohort_matrix is None or
-                    st.session_state.sorted_periods is None or
-                    st.session_state.year_month_col != year_month_col or
-                    st.session_state.client_col != client_col
-                )
+        try:
+            # Загрузка Excel файла
+            if uploaded_file.name.endswith('.xlsx'):
+                df = pd.read_excel(uploaded_file, engine='openpyxl')
+            else:
+                df = pd.read_excel(uploaded_file, engine='xlrd')
+            
+            # Сохранение данных в session state
+            # Проверяем, новый ли это файл
+            is_new_file = (
+                st.session_state.uploaded_data is None or 
+                st.session_state.uploaded_data.name != uploaded_file.name
+            )
+            
+            st.session_state.uploaded_data = uploaded_file
+            st.session_state.df = df
+            
+            # Очищаем старую информацию только при загрузке нового файла
+            if is_new_file:
+                st.session_state.cohort_info = None
+                st.session_state.cohort_matrix = None
+                st.session_state.sorted_periods = None
+                st.session_state.year_month_col = None
+                st.session_state.client_col = None
+            
+            # Построение когортной матрицы
+            st.markdown("---")
+            
+            # Определяем столбцы автоматически
+            expected_columns = {
+                'Год-месяц': 'Год-месяц',
+                'Год-Неделя': 'Год-Неделя',
+                'Год-неделя': 'Год-неделя',
+                'Год-Месяц': 'Год-Месяц',
+                'Код клиента': 'Код клиента'
+            }
+            
+            # Проверяем наличие ожидаемых столбцов
+            year_month_col = None
+            client_col = None
+            
+            # Ищем столбец с периодом (год-месяц или год-неделя)
+            for col in df.columns:
+                col_lower = str(col).lower()
+                if 'год' in col_lower and ('месяц' in col_lower or 'неделя' in col_lower or 'неделя' in col_lower):
+                    year_month_col = col
+                    break
+            
+            # Ищем столбец с кодом клиента
+            for col in df.columns:
+                col_lower = str(col).lower()
+                if 'код' in col_lower and 'клиент' in col_lower:
+                    client_col = col
+                    break
+            
+            # Если столбцы не найдены, показываем ошибку
+            if year_month_col is None:
+                st.error("❌ Не найден столбец с периодом (Год-месяц или Год-Неделя). Убедитесь, что в файле есть столбец с названием, содержащим 'Год' и 'месяц' или 'неделя'.")
+                st.stop()
+            
+            if client_col is None:
+                st.error("❌ Не найден столбец с кодом клиента. Убедитесь, что в файле есть столбец с названием, содержащим 'Код' и 'клиент'.")
+                st.stop()
+            
+            # Сохраняем выбранные столбцы в session state
+            st.session_state.year_month_col = year_month_col
+            st.session_state.client_col = client_col
+            
+            # Построение матрицы
+            if year_month_col and client_col:
+                try:
+                    # Проверяем, есть ли уже вычисленные данные
+                    need_recompute = (
+                        st.session_state.cohort_matrix is None or
+                        st.session_state.sorted_periods is None or
+                        st.session_state.year_month_col != year_month_col or
+                        st.session_state.client_col != client_col
+                    )
                 
                 # Создаём контейнер для всего контента
                 content_placeholder = st.empty()
@@ -2860,14 +2860,14 @@ elif st.session_state.current_page == 'cohort':
                             st.error(f"❌ Ошибка при обработке файла: {str(e)}")
                             st.exception(e)
                     
-            except Exception as e:
-                st.error(f"❌ Ошибка при построении матрицы: {str(e)}")
-                st.exception(e)
-        else:
-            st.warning("⚠️ Необходимо указать столбцы для построения матрицы")
+                except Exception as e:
+                    st.error(f"❌ Ошибка при построении матрицы: {str(e)}")
+                    st.exception(e)
+            else:
+                st.warning("⚠️ Необходимо указать столбцы для построения матрицы")
             
-    except Exception as e:
-        st.error(f"❌ Ошибка при загрузке файла: {str(e)}")
-        st.session_state.uploaded_data = None
-        st.session_state.df = None
+        except Exception as e:
+            st.error(f"❌ Ошибка при загрузке файла: {str(e)}")
+            st.session_state.uploaded_data = None
+            st.session_state.df = None
 
