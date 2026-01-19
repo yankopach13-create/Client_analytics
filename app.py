@@ -1510,36 +1510,36 @@ elif st.session_state.current_page == 'cohort':
                         
                         # После завершения всех расчётов очищаем placeholder и отображаем весь контент
                         content_placeholder.empty()
-                else:
-                    # Используем сохраненные данные
-                    cohort_matrix = st.session_state.cohort_matrix
-                    sorted_periods = st.session_state.sorted_periods
-                    # Проверяем наличие остальных матриц
-                    if st.session_state.get('accumulation_matrix') is None:
-                        st.session_state.accumulation_matrix = build_accumulation_matrix(df, year_month_col, client_col, sorted_periods)
-                    if st.session_state.get('accumulation_percent_matrix') is None:
-                        st.session_state.accumulation_percent_matrix = build_accumulation_percent_matrix(st.session_state.accumulation_matrix, cohort_matrix)
-                    if st.session_state.get('inflow_matrix') is None:
-                        st.session_state.inflow_matrix = build_inflow_matrix(st.session_state.accumulation_percent_matrix)
-                    if st.session_state.get('churn_table') is None:
-                        st.session_state.churn_table = build_churn_table(df, year_month_col, client_col, sorted_periods, cohort_matrix, st.session_state.accumulation_matrix, st.session_state.accumulation_percent_matrix)
-                    
-                    # Создаем кэш множеств клиентов, если его еще нет
-                    if st.session_state.get('period_clients_cache') is None:
-                        period_clients_cache = {}
-                        for period in sorted_periods:
-                            period_data = df[df[year_month_col] == period]
-                            period_clients_cache[period] = set(period_data[client_col].dropna().unique())
-                        st.session_state.period_clients_cache = period_clients_cache
-                    
-                    # Получаем информацию из session state
-                    info = st.session_state.cohort_info
-                    
-                    # Отображаем кнопки скачивания под блоком загрузки (горизонтально)
-                    st.markdown("---")
-                    if info:
-                        # Создаем функцию для генерации полного отчёта
-                        def create_full_report_excel():
+                    else:
+                        # Используем сохраненные данные
+                        cohort_matrix = st.session_state.cohort_matrix
+                        sorted_periods = st.session_state.sorted_periods
+                        # Проверяем наличие остальных матриц
+                        if st.session_state.get('accumulation_matrix') is None:
+                            st.session_state.accumulation_matrix = build_accumulation_matrix(df, year_month_col, client_col, sorted_periods)
+                        if st.session_state.get('accumulation_percent_matrix') is None:
+                            st.session_state.accumulation_percent_matrix = build_accumulation_percent_matrix(st.session_state.accumulation_matrix, cohort_matrix)
+                        if st.session_state.get('inflow_matrix') is None:
+                            st.session_state.inflow_matrix = build_inflow_matrix(st.session_state.accumulation_percent_matrix)
+                        if st.session_state.get('churn_table') is None:
+                            st.session_state.churn_table = build_churn_table(df, year_month_col, client_col, sorted_periods, cohort_matrix, st.session_state.accumulation_matrix, st.session_state.accumulation_percent_matrix)
+                        
+                        # Создаем кэш множеств клиентов, если его еще нет
+                        if st.session_state.get('period_clients_cache') is None:
+                            period_clients_cache = {}
+                            for period in sorted_periods:
+                                period_data = df[df[year_month_col] == period]
+                                period_clients_cache[period] = set(period_data[client_col].dropna().unique())
+                            st.session_state.period_clients_cache = period_clients_cache
+                        
+                        # Получаем информацию из session state
+                        info = st.session_state.cohort_info
+                        
+                        # Отображаем кнопки скачивания под блоком загрузки (горизонтально)
+                        st.markdown("---")
+                        if info:
+                            # Создаем функцию для генерации полного отчёта
+                            def create_full_report_excel():
                             """Создает полный Excel отчёт со всеми таблицами"""
                             buffer = io.BytesIO()
                             
