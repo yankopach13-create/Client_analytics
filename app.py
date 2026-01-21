@@ -2069,30 +2069,40 @@ if uploaded_file is not None:
                     
                     elif view_type == "Отток клиентов из категории":
                         # Используем сохраненную таблицу оттока
-                        churn_table = st.session_state.churn_table
-                        
-                        # Форматируем таблицу для отображения
-                        churn_display = churn_table.copy()
-                        churn_display['Накопительный % возврата'] = churn_display['Накопительный % возврата'].apply(lambda x: f"{x:.1f}%")
-                        churn_display['Отток %'] = churn_display['Отток %'].apply(lambda x: f"{x:.1f}%")
-                        
-                        # Используем churn_display как display_matrix для единообразия
-                        display_matrix = churn_display
-                        description_text = "Показывает клиентов, которые не вернулись в категорию ни разу после периода когорты."
-                        view_key = "churn"
+                        if st.session_state.get('churn_table') is not None:
+                            churn_table = st.session_state.churn_table
+                            
+                            # Форматируем таблицу для отображения
+                            churn_display = churn_table.copy()
+                            churn_display['Накопительный % возврата'] = churn_display['Накопительный % возврата'].apply(lambda x: f"{x:.1f}%")
+                            churn_display['Отток %'] = churn_display['Отток %'].apply(lambda x: f"{x:.1f}%")
+                            
+                            # Используем churn_display как display_matrix для единообразия
+                            display_matrix = churn_display
+                            description_text = "Показывает клиентов, которые не вернулись в категорию ни разу после периода когорты."
+                            view_key = "churn"
+                        else:
+                            st.error("Таблица оттока не загружена. Пожалуйста, загрузите данные заново.")
+                            display_matrix = None
+                            description_text = ""
+                            view_key = ""
                     
                     # Отображение описания с красивым оформлением
-                    st.markdown(f'<div class="description-block">{description_text}</div>', unsafe_allow_html=True)
+                    if description_text:
+                        st.markdown(f'<div class="description-block">{description_text}</div>', unsafe_allow_html=True)
                     
                     # Создаем колонки для таблицы и кодов клиентов
                     col_table, col_clients = st.columns([4, 1])
                     
                     with col_table:
                         # Отображение таблицы (широкая) с поддержкой полноэкранного режима
-                        st.dataframe(
-                            display_matrix,
-                            use_container_width=True
-                        )
+                        if display_matrix is not None:
+                            st.dataframe(
+                                display_matrix,
+                                use_container_width=True
+                            )
+                        else:
+                            st.info("Выберите тип отображения для просмотра данных.")
                     
                     with col_clients:
                         # Компактный блок кодов клиентов
