@@ -2076,8 +2076,7 @@ if uploaded_file is not None:
                         # Отображение таблицы (широкая) с поддержкой полноэкранного режима
                         st.dataframe(
                             display_matrix,
-                            use_container_width=True,
-                            height=None  # None позволяет Streamlit автоматически определить высоту и показать тулбар
+                            use_container_width=True
                         )
                     
                     with col_clients:
