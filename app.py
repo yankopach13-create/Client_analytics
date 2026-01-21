@@ -1971,6 +1971,20 @@ if uploaded_file is not None:
                     div[data-testid="stRadio"] {
                         max-width: 100%;
                     }
+                    
+                    /* Стили для кнопок Excel и PDF с иконками */
+                    div[data-testid="stDownloadButton"] button,
+                    div[data-testid="stButton"] button {
+                        font-size: 24px !important;
+                        padding: 10px !important;
+                        min-height: 40px !important;
+                    }
+                    
+                    div[data-testid="stDownloadButton"] button p,
+                    div[data-testid="stButton"] button p {
+                        font-size: 24px !important;
+                        margin: 0 !important;
+                    }
                     </style>
                     """, unsafe_allow_html=True)
                     
@@ -2136,6 +2150,68 @@ if uploaded_file is not None:
                             st.info("Выберите тип отображения для просмотра данных.")
                     
                     with col_clients:
+                        # Кнопки скачивания отчётов (Excel и PDF) с иконками без текста
+                        if st.session_state.get('cohort_info') is not None:
+                            col_excel_btn, col_pdf_btn = st.columns(2)
+                            
+                            with col_excel_btn:
+                                # Используем данные Excel из session_state
+                                if 'excel_report_data' in st.session_state and st.session_state.excel_report_data is not None:
+                                    excel_data_full = st.session_state.excel_report_data
+                                    info = st.session_state.get('cohort_info', {})
+                                    first_period = info.get('first_period', 'unknown')
+                                    last_period = info.get('last_period', 'unknown')
+                                    
+                                    st.download_button(
+                                        label="📊",
+                                        data=excel_data_full,
+                                        file_name=f"полный_отчёт_когортный_анализ_{first_period}_{last_period}.xlsx",
+                                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                        use_container_width=True,
+                                        key="download_excel_icon_clients"
+                                    )
+                            
+                            with col_pdf_btn:
+                                # Кнопка для генерации и скачивания PDF
+                                if st.button("📄", key="generate_pdf_icon_clients", use_container_width=True):
+                                    st.session_state.should_generate_pdf = True
+                                    st.rerun()
+                            
+                            if st.session_state.get('should_generate_pdf', False):
+                                try:
+                                    # Импортируем необходимые модули для PDF
+                                    import io
+                                    from reportlab.lib.pagesizes import A4
+                                    from reportlab.platypus import SimpleDocTemplate, Paragraph
+                                    from reportlab.lib.styles import getSampleStyleSheet
+                                    
+                                    buffer = io.BytesIO()
+                                    doc = SimpleDocTemplate(buffer, pagesize=A4)
+                                    story = []
+                                    styles = getSampleStyleSheet()
+                                    story.append(Paragraph("Отчёт", styles['Title']))
+                                    doc.build(story)
+                                    buffer.seek(0)
+                                    pdf_data = buffer.getvalue()
+                                    
+                                    info = st.session_state.get('cohort_info', {})
+                                    first_period = info.get('first_period', 'unknown')
+                                    last_period = info.get('last_period', 'unknown')
+                                    
+                                    st.download_button(
+                                        label="📄",
+                                        data=pdf_data,
+                                        file_name=f"анализ_когортный_{first_period}_{last_period}.pdf",
+                                        mime="application/pdf",
+                                        use_container_width=True,
+                                        key="download_pdf_icon_clients"
+                                    )
+                                    st.session_state.should_generate_pdf = False
+                                except Exception as e:
+                                    st.error(f"Ошибка генерации PDF: {str(e)}")
+                            
+                            st.markdown("<br>", unsafe_allow_html=True)
+                        
                         # Компактный блок кодов клиентов
                         st.markdown('<div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 10px; border-radius: 8px; margin-bottom: 10px;"><h4 style="color: white; margin: 0;">👥 Коды клиентов</h4></div>', unsafe_allow_html=True)
                         
