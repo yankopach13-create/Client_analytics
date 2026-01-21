@@ -1990,6 +1990,37 @@ if uploaded_file is not None:
                     div[data-testid="stRadio"] {
                         max-width: 100%;
                     }
+                    
+                    /* Стили для полноэкранного режима таблицы */
+                    .table-wrapper {
+                        position: relative;
+                    }
+                    
+                    .table-wrapper.fullscreen-table {
+                        position: fixed !important;
+                        top: 0 !important;
+                        left: 0 !important;
+                        width: 100vw !important;
+                        height: 100vh !important;
+                        z-index: 9999 !important;
+                        background: rgba(0, 0, 0, 0.95) !important;
+                        padding: 60px 20px 20px 20px !important;
+                        overflow: auto !important;
+                    }
+                    
+                    .table-wrapper.fullscreen-table > div[data-testid="stDataFrame"] {
+                        max-width: 98% !important;
+                        max-height: 90vh !important;
+                        margin: 0 auto !important;
+                        background: white !important;
+                    }
+                    
+                    /* Стили для кнопки полноэкранного режима */
+                    div[data-testid="stButton"] > button {
+                        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+                        color: white !important;
+                        font-weight: 600 !important;
+                    }
                     </style>
                     """, unsafe_allow_html=True)
                     
@@ -2092,11 +2123,28 @@ if uploaded_file is not None:
                     col_table, col_clients = st.columns([4, 1])
                     
                     with col_table:
+                        # Кнопка для полноэкранного режима
+                        if 'table_fullscreen' not in st.session_state:
+                            st.session_state.table_fullscreen = False
+                        
+                        col_btn1, col_btn2 = st.columns([1, 19])
+                        with col_btn1:
+                            if st.button("🔍 Полный экран" if not st.session_state.table_fullscreen else "✕ Обычный вид", key="fullscreen_toggle"):
+                                st.session_state.table_fullscreen = not st.session_state.table_fullscreen
+                                st.rerun()
+                        
+                        # Обертка для таблицы с возможностью полноэкранного режима
+                        table_wrapper_class = "fullscreen-table" if st.session_state.table_fullscreen else ""
+                        st.markdown(f'<div class="table-wrapper {table_wrapper_class}" id="main-table-wrapper">', unsafe_allow_html=True)
+                        
                         # Отображение таблицы (широкая)
                         st.dataframe(
                             display_matrix,
-                            use_container_width=True
+                            use_container_width=True,
+                            key="main_display_table"
                         )
+                        
+                        st.markdown('</div>', unsafe_allow_html=True)
                     
                     with col_clients:
                         # Компактный блок кодов клиентов
