@@ -1956,28 +1956,42 @@ if uploaded_file is not None:
                     
                     /* Стили для описания */
                     .description-block {
-                        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                        background: transparent;
                         padding: 15px;
                         border-radius: 10px;
                         margin-bottom: 15px;
-                        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-                        color: white;
+                        box-shadow: none;
+                        color: inherit;
+                    }
+                    
+                    /* Контейнер для кнопок - ограничиваем ширину как у описания */
+                    .stRadio {
+                        max-width: 100%;
+                    }
+                    
+                    /* Ограничиваем ширину контейнера кнопок */
+                    div[data-testid="stRadio"] {
+                        max-width: 100%;
                     }
                     </style>
                     """, unsafe_allow_html=True)
                     
-                    # Переключатель для выбора типа отображения (горизонтально, на уровне с таблицей)
-                    view_type = st.radio(
-                        "",
-                        options=[
-                            "Динамика уникальных клиентов когорт",
-                            "Динамика накопления возврата",
-                            "Динамика накопления возврата в %",
-                            "Приток возврата в %"
-                        ],
-                        horizontal=True,
-                        key="view_type_selector"
-                    )
+                    # Создаем колонки для выравнивания кнопок с блоком описания
+                    col_buttons_container, col_empty = st.columns([4, 1])
+                    
+                    with col_buttons_container:
+                        # Переключатель для выбора типа отображения (горизонтально, на уровне с таблицей)
+                        view_type = st.radio(
+                            "",
+                            options=[
+                                "Динамика уникальных клиентов когорт",
+                                "Динамика накопления возврата",
+                                "Динамика накопления возврата в %",
+                                "Приток возврата в %"
+                            ],
+                            horizontal=True,
+                            key="view_type_selector"
+                        )
                     
                     st.markdown("<br>", unsafe_allow_html=True)
                     
