@@ -2095,15 +2095,8 @@ if uploaded_file is not None:
                                           'Накопительный % возврата', 'Отток кол-во', 'Отток %']
                             churn_display = churn_display[column_order]
                             
-                            # Применяем стили для центрирования значений во всех столбцах
-                            def center_format(val):
-                                return 'text-align: center'
-                            
-                            # Создаем стилизованную таблицу с центрированием
-                            styled_churn = churn_display.style.applymap(center_format)
-                            
-                            # Используем styled_churn как display_matrix для единообразия
-                            display_matrix = styled_churn
+                            # Используем churn_display как display_matrix (без стилизации через pandas, так как st.dataframe не поддерживает это полностью)
+                            display_matrix = churn_display
                             description_text = "Показывает клиентов, которые не вернулись в категорию ни разу после периода когорты."
                             view_key = "churn"
                         else:
@@ -2122,24 +2115,53 @@ if uploaded_file is not None:
                     with col_table:
                         # Отображение таблицы (широкая) с поддержкой полноэкранного режима
                         if display_matrix is not None:
-                            # Для таблицы оттока скрываем индекс
+                            # Для таблицы оттока скрываем индекс и центрируем все значения
                             if view_key == "churn":
-                                st.dataframe(
-                                    display_matrix,
-                                    use_container_width=True,
-                                    hide_index=True
-                                )
-                                # Добавляем CSS для центрирования значений в таблице оттока
+                                # Добавляем CSS для центрирования значений в таблице оттока ПЕРЕД отображением
                                 st.markdown("""
                                 <style>
-                                div[data-testid="stDataFrame"] table td {
+                                /* Центрирование для таблицы оттока - применяем ко всем ячейкам через уникальный key */
+                                div[data-testid="stDataFrame"][data-baseweb="data-table"] table,
+                                div[data-testid="stDataFrame"] table {
+                                    width: 100% !important;
+                                }
+                                /* Центрируем все ячейки таблицы */
+                                div[data-testid="stDataFrame"] table td,
+                                div[data-testid="stDataFrame"] table th {
+                                    text-align: center !important;
+                                    vertical-align: middle !important;
+                                }
+                                /* Убеждаемся, что все значения в tbody центрированы */
+                                div[data-testid="stDataFrame"] table tbody td {
                                     text-align: center !important;
                                 }
-                                div[data-testid="stDataFrame"] table th {
+                                /* Убеждаемся, что все заголовки центрированы */
+                                div[data-testid="stDataFrame"] table thead th {
+                                    text-align: center !important;
+                                }
+                                /* Центрирование для всех элементов внутри ячеек (включая span, div и т.д.) */
+                                div[data-testid="stDataFrame"] table td span,
+                                div[data-testid="stDataFrame"] table td div,
+                                div[data-testid="stDataFrame"] table th span,
+                                div[data-testid="stDataFrame"] table th div {
+                                    text-align: center !important;
+                                    display: block !important;
+                                    width: 100% !important;
+                                }
+                                /* Центрирование для числовых значений */
+                                div[data-testid="stDataFrame"] table td[data-testid="stDataFrameCell"],
+                                div[data-testid="stDataFrame"] table th[data-testid="stDataFrameHeaderCell"] {
                                     text-align: center !important;
                                 }
                                 </style>
                                 """, unsafe_allow_html=True)
+                                
+                                st.dataframe(
+                                    display_matrix,
+                                    use_container_width=True,
+                                    hide_index=True,
+                                    key="churn_dataframe_display"
+                                )
                             else:
                                 st.dataframe(
                                     display_matrix,
