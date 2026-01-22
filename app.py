@@ -2498,8 +2498,70 @@ if uploaded_file is not None:
                                 # Получаем клиентов оттока для каждой когорты
                                 period_clients_cache = st.session_state.get('period_clients_cache', None)
                                 
-                                # Сохраняем данные для Excel отчёта (пустые таблицы, так как логика изменилась)
-                                st.session_state.category_summary_table = None
+                                # Рассчитываем метрики для всех когорт для сводной таблицы
+                                total_present_by_cohort = {}
+                                network_churn_by_cohort = {}
+                                network_churn_percent_by_cohort = {}
+                                
+                                # Собираем всех клиентов из категорий (для всех периодов)
+                                all_category_clients_all_periods = set()
+                                if year_month_col is not None:
+                                    for category in categories:
+                                        category_data = df_categories[df_categories[group_col] == category]
+                                        category_clients = set(category_data[client_code_col].dropna().astype(str).unique())
+                                        all_category_clients_all_periods.update(category_clients)
+                                else:
+                                    for category in categories:
+                                        category_data = df_categories[df_categories[group_col] == category]
+                                        category_clients = set(category_data[client_code_col].dropna().astype(str).unique())
+                                        all_category_clients_all_periods.update(category_clients)
+                                
+                                # Для каждой когорты рассчитываем метрики
+                                for cohort_period in sorted_periods:
+                                    # Получаем клиентов оттока для этой когорты
+                                    churn_clients_set_cohort = set(get_churn_clients(df, year_month_col, client_col, sorted_periods, cohort_period, period_clients_cache))
+                                    churn_clients_set_cohort = {str(client) for client in churn_clients_set_cohort}
+                                    
+                                    # Определяем периоды начиная с этой когорты
+                                    cohort_index_cohort = sorted_periods.index(cohort_period) if cohort_period in sorted_periods else 0
+                                    periods_from_cohort_cohort = sorted_periods[cohort_index_cohort:]
+                                    
+                                    # Собираем клиентов из категорий только для периодов >= когорты
+                                    all_category_clients_from_cohort = set()
+                                    if year_month_col is not None:
+                                        for category in categories:
+                                            category_data = df_categories[df_categories[group_col] == category]
+                                            category_data_filtered = category_data[category_data[year_month_col].isin(periods_from_cohort_cohort)]
+                                            category_clients = set(category_data_filtered[client_code_col].dropna().astype(str).unique())
+                                            all_category_clients_from_cohort.update(category_clients)
+                                    else:
+                                        all_category_clients_from_cohort = all_category_clients_all_periods
+                                    
+                                    # Клиенты оттока, присутствующие в других категориях (начиная с периода когорты)
+                                    present_in_categories_cohort = churn_clients_set_cohort & all_category_clients_from_cohort
+                                    total_present_by_cohort[cohort_period] = len(present_in_categories_cohort)
+                                    
+                                    # Отток из сети = клиенты оттока, которые не появились ни в одной категории после периода когорты
+                                    network_churn_cohort = len(churn_clients_set_cohort - all_category_clients_from_cohort)
+                                    network_churn_by_cohort[cohort_period] = network_churn_cohort
+                                    
+                                    # % оттока из сети
+                                    churn_table = st.session_state.churn_table
+                                    cohort_row = churn_table[churn_table['Когорта'] == cohort_period]
+                                    cohort_size_cohort = int(cohort_row.iloc[0]['Кол-во клиентов когорты']) if not cohort_row.empty else 0
+                                    network_churn_percent_cohort = (network_churn_cohort / cohort_size_cohort * 100) if cohort_size_cohort > 0 else 0
+                                    network_churn_percent_by_cohort[cohort_period] = network_churn_percent_cohort
+                                
+                                # Создаем таблицу для сохранения в session_state
+                                summary_table_excel = pd.DataFrame({
+                                    'Отток из сети': network_churn_by_cohort,
+                                    'Доля оттока из сети от когорты': network_churn_percent_by_cohort,
+                                    'Итого присутствуют в других категориях': total_present_by_cohort
+                                })
+                                summary_table_excel = summary_table_excel.T
+                                
+                                # Сохраняем данные для Excel отчёта и сводной таблицы
+                                st.session_state.category_summary_table = summary_table_excel
                                 st.session_state.category_cohort_table = None
                                 
                                 # Обновляем Excel отчёт (очищаем старые данные)
