@@ -2884,7 +2884,9 @@ if uploaded_file is not None:
                                 summary_table_excel = pd.DataFrame({
                                     'Отток из сети': network_churn_by_cohort,
                                     'Доля оттока из сети от когорты': network_churn_percent_by_cohort,
-                                    'Итого присутствуют в других категориях': total_present_by_cohort
+                                    'Итого присутствуют в других категориях': total_present_by_cohort,
+                                    'Итого присутствуют в других категориях после месяца когорты': total_present_after_cohort_by_cohort,
+                                    'Доля присутствуют в других категориях после месяца когорты': total_present_after_cohort_percent_by_cohort
                                 })
                                 summary_table_excel = summary_table_excel.T
                                 
@@ -2953,6 +2955,7 @@ if uploaded_file is not None:
                                     # Клиенты оттока, присутствующие в других категориях (начиная с периода когорты)
                                     present_in_categories = churn_clients_set & all_category_clients
                                     present_count = len(present_in_categories)
+                                    present_percent = (present_count / cohort_size * 100) if cohort_size > 0 else 0
                                     
                                     # Клиенты оттока, присутствующие в других категориях ПОСЛЕ месяца когорты (исключая период когорты)
                                     periods_after_cohort = periods_from_cohort[1:] if len(periods_from_cohort) > 1 else []
@@ -2971,35 +2974,30 @@ if uploaded_file is not None:
                                     
                                     present_in_categories_after_cohort = churn_clients_set & all_category_clients_after_cohort
                                     present_count_after_cohort = len(present_in_categories_after_cohort)
-                                    
-                                    # % присутствия после месяца когорты
                                     present_percent_after_cohort = (present_count_after_cohort / cohort_size * 100) if cohort_size > 0 else 0
                                     
                                     # Отток из сети = клиенты оттока, которые не появились ни в одной категории после периода когорты
                                     network_churn = len(churn_clients_set - all_category_clients)
+                                    network_churn_percent = (network_churn / cohort_size * 100) if cohort_size > 0 else 0
                                     
                                     # Вычисляем клиентов оттока из сети (тех, кто не присутствует ни в одной категории)
                                     network_churn_clients = churn_clients_set - all_category_clients
                                     network_churn_clients_list = sorted(list(network_churn_clients))
                                     
-                                    # Выводим метрики в текстовом формате с цветом
+                                    # Выводим метрики в текстовом формате с цветом (проценты в скобках)
                                     metrics_html = f"""
                                     <div style="line-height: 2;">
                                     <p style="color: #333; font-size: 1rem; margin: 8px 0;">
                                         <strong style="color: #1f77b4;">Клиентов когорты присутствуют в других категориях:</strong> 
-                                        <span style="color: #2c3e50; font-weight: 600;">{present_count}</span>
+                                        <span style="color: #2c3e50; font-weight: 600;">{present_count} ({present_percent:.1f}%)</span>
                                     </p>
                                     <p style="color: #333; font-size: 1rem; margin: 8px 0;">
                                         <strong style="color: #1f77b4;">Клиентов когорты присутствуют в других категориях после месяца когорты:</strong> 
-                                        <span style="color: #2c3e50; font-weight: 600;">{present_count_after_cohort}</span>
-                                    </p>
-                                    <p style="color: #333; font-size: 1rem; margin: 8px 0;">
-                                        <strong style="color: #1f77b4;">Клиентов когорты присутствуют в других категориях после месяца когорты%:</strong> 
-                                        <span style="color: #2c3e50; font-weight: 600;">{present_percent_after_cohort:.1f}%</span>
+                                        <span style="color: #2c3e50; font-weight: 600;">{present_count_after_cohort} ({present_percent_after_cohort:.1f}%)</span>
                                     </p>
                                     <p style="color: #333; font-size: 1rem; margin: 8px 0;">
                                         <strong style="color: #1f77b4;">Отток из сети:</strong> 
-                                        <span style="color: #e74c3c; font-weight: 600;">{network_churn}</span>
+                                        <span style="color: #e74c3c; font-weight: 600;">{network_churn} ({network_churn_percent:.1f}%)</span>
                                     </p>
                                     </div>
                                     """
