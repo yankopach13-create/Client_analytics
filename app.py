@@ -2374,7 +2374,7 @@ if uploaded_file is not None:
                                 if all_churn_clients:
                                     all_clients_csv = "\n".join([str(client) for client in sorted(all_churn_clients)])
                                     st.download_button(
-                                        label=f"💾 Скачать коды всех когорт ({len(all_churn_clients)})",
+                                        label=f"💾 Скачать коды клиентов оттока всех когорт ({len(all_churn_clients)})",
                                         data=all_clients_csv,
                                         file_name=f"отток_клиентов_все_когорты.txt",
                                         mime="text/plain",
