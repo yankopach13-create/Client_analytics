@@ -2525,6 +2525,9 @@ if uploaded_file is not None:
                                         key="category_cohort_select"
                                     )
                                     
+                                    # Определяем периоды начиная с выбранной когорты
+                                    cohort_index = sorted_periods.index(selected_cohort) if selected_cohort in sorted_periods else 0
+                                    periods_from_cohort = sorted_periods[cohort_index:]
                                     # Получаем клиентов оттока для выбранной когорты
                                     churn_clients_set = set(get_churn_clients(df, year_month_col, client_col, sorted_periods, selected_cohort, period_clients_cache))
                                     churn_clients_set = {str(client) for client in churn_clients_set}
@@ -2536,12 +2539,15 @@ if uploaded_file is not None:
                                     churn_count = int(cohort_row.iloc[0]['Отток кол-во']) if not cohort_row.empty else 0
                                     
                                     # Собираем всех уникальных клиентов оттока, которые присутствуют хотя бы в одной категории
+                                    # ТОЛЬКО в периодах начиная с выбранной когорты
                                     all_category_clients = set()
                                     if year_month_col is not None:
-                                        # Используем все данные из файла категорий
+                                        # Используем только данные из периодов >= выбранной когорты
                                         for category in categories:
                                             category_data = df_categories[df_categories[group_col] == category]
-                                            category_clients = set(category_data[client_code_col].dropna().astype(str).unique())
+                                            # Фильтруем только периоды >= выбранной когорты
+                                            category_data_filtered = category_data[category_data[year_month_col].isin(periods_from_cohort)]
+                                            category_clients = set(category_data_filtered[client_code_col].dropna().astype(str).unique())
                                             all_category_clients.update(category_clients)
                                     else:
                                         # Если нет столбца "Год-месяц", используем все данные
@@ -2550,12 +2556,12 @@ if uploaded_file is not None:
                                             category_clients = set(category_data[client_code_col].dropna().astype(str).unique())
                                             all_category_clients.update(category_clients)
                                     
-                                    # Клиенты оттока, присутствующие в других категориях
+                                    # Клиенты оттока, присутствующие в других категориях (начиная с периода когорты)
                                     present_in_categories = churn_clients_set & all_category_clients
                                     present_count = len(present_in_categories)
                                     
-                                    # Отток из сети
-                                    network_churn = max(0, churn_count - present_count)
+                                    # Отток из сети = клиенты оттока, которые не появились ни в одной категории после периода когорты
+                                    network_churn = len(churn_clients_set - all_category_clients)
                                     
                                     # % оттока из сети
                                     network_churn_percent = (network_churn / cohort_size * 100) if cohort_size > 0 else 0
@@ -2602,19 +2608,23 @@ if uploaded_file is not None:
                                         st.info("ℹ️ Отток из сети равен 0 или все клиенты оттока присутствуют в других категориях")
                                 
                                 with col_table:
-                                    # Создаем таблицу: категории по строкам, периоды по столбцам
-                                    category_period_table = pd.DataFrame(index=categories, columns=sorted_periods)
+                                    # Определяем периоды начиная с выбранной когорты (для использования в таблице)
+                                    cohort_index_table = sorted_periods.index(selected_cohort) if selected_cohort in sorted_periods else 0
+                                    periods_from_cohort = sorted_periods[cohort_index_table:]
+                                    
+                                    # Создаем таблицу: категории по строкам, периоды по столбцам (только начиная с выбранной когорты)
+                                    category_period_table = pd.DataFrame(index=categories, columns=periods_from_cohort)
                                     
                                     # Словарь для хранения уникальных клиентов по периодам (для итоговой строки)
-                                    period_unique_clients = {period: set() for period in sorted_periods}
+                                    period_unique_clients = {period: set() for period in periods_from_cohort}
                                     
                                     # Словарь для хранения уникальных клиентов по категориям (для итогового столбца)
                                     category_unique_clients = {category: set() for category in categories}
                                     
                                     # Если есть столбец "Год-месяц", используем его для фильтрации по периодам
                                     if year_month_col is not None:
-                                        # Для каждого периода проверяем присутствие клиентов оттока в категориях
-                                        for period in sorted_periods:
+                                        # Для каждого периода начиная с выбранной когорты проверяем присутствие клиентов оттока в категориях
+                                        for period in periods_from_cohort:
                                             # Фильтруем данные по периоду
                                             period_data = df_categories[df_categories[year_month_col] == period]
                                             
@@ -2647,8 +2657,8 @@ if uploaded_file is not None:
                                             client_codes = set(category_data[client_code_col].dropna().astype(str).unique())
                                             category_clients_dict[category] = client_codes
                                         
-                                        # Для каждого периода (для совместимости с таблицей) используем одинаковые данные
-                                        for period in sorted_periods:
+                                        # Для каждого периода начиная с выбранной когорты используем одинаковые данные
+                                        for period in periods_from_cohort:
                                             for category in categories:
                                                 category_clients_set = category_clients_dict.get(category, set())
                                                 intersection = churn_clients_set & category_clients_set
@@ -2663,7 +2673,7 @@ if uploaded_file is not None:
                                     
                                     # Создаем итоговую строку по периодам (уникальные клиенты по всем категориям)
                                     totals_row = pd.Series(
-                                        {period: len(period_unique_clients[period]) for period in sorted_periods},
+                                        {period: len(period_unique_clients[period]) for period in periods_from_cohort},
                                         name='Итого клиентов'
                                     )
                                     
@@ -2686,7 +2696,7 @@ if uploaded_file is not None:
                                     category_period_table_with_totals = category_period_table_with_totals.reindex(new_index)
                                     
                                     # Переупорядочиваем столбцы: итоговый столбец слева (после индекса, перед периодами)
-                                    new_columns = ['Итого'] + list(sorted_periods)
+                                    new_columns = ['Итого'] + list(periods_from_cohort)
                                     category_period_table_with_totals = category_period_table_with_totals[new_columns]
                                     
                                     # Отображаем основную таблицу с итогами
