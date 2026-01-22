@@ -1446,12 +1446,15 @@ if uploaded_file is not None:
                         <style>
                         div[data-testid="stDownloadButton"] > button {
                             height: 60px !important;
-                            font-size: 20px !important;
+                            font-size: 40px !important;
                             font-weight: bold !important;
                             padding: 15px 30px !important;
+                            background: white !important;
+                            color: #333 !important;
+                            border: 2px solid #ccc !important;
                         }
                         div[data-testid="stDownloadButton"] > button > div > p {
-                            font-size: 20px !important;
+                            font-size: 40px !important;
                             font-weight: bold !important;
                         }
                         </style>
@@ -1987,20 +1990,20 @@ if uploaded_file is not None:
                         gap: 10px !important;
                     }
                     
-                    /* Стили для кнопок Excel и PDF - менее яркие цвета с большим шрифтом */
+                    /* Стили для кнопок Excel и PDF - белые с большим шрифтом */
                     div[data-testid="stDownloadButton"] button,
                     div[data-testid="stButton"] button {
-                        background: linear-gradient(135deg, #95a5a6 0%, #7f8c8d 100%) !important;
-                        color: white !important;
+                        background: white !important;
+                        color: #333 !important;
                         padding: 15px 20px !important;
                         border-radius: 8px !important;
                         margin: 0 !important;
                         font-weight: 700 !important;
-                        font-size: 1.1rem !important;
+                        font-size: 2.2rem !important;
                         line-height: 1.3 !important;
                         transition: all 0.3s ease !important;
-                        border: 2px solid rgba(149, 165, 166, 0.4) !important;
-                        box-shadow: 0 2px 4px rgba(149, 165, 166, 0.2) !important;
+                        border: 2px solid #ccc !important;
+                        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
                         cursor: pointer !important;
                         text-align: center !important;
                         min-height: 60px !important;
@@ -2016,14 +2019,14 @@ if uploaded_file is not None:
                     div[data-testid="stDownloadButton"] button:hover,
                     div[data-testid="stButton"] button:hover {
                         transform: translateY(-2px) !important;
-                        box-shadow: 0 4px 8px rgba(149, 165, 166, 0.3) !important;
-                        background: linear-gradient(135deg, #7f8c8d 0%, #95a5a6 100%) !important;
+                        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2) !important;
+                        background: #f5f5f5 !important;
                     }
                     
                     div[data-testid="stDownloadButton"] button:active,
                     div[data-testid="stButton"] button:active {
                         transform: translateY(0) !important;
-                        box-shadow: 0 2px 4px rgba(149, 165, 166, 0.2) !important;
+                        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
                     }
                     </style>
                     """, unsafe_allow_html=True)
