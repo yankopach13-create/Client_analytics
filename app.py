@@ -1377,70 +1377,6 @@ if uploaded_file is not None:
                                                 cell.value = float(cell.value) / 100.0
                                                 cell.number_format = '0.0%'  # Процентный формат Excel
                                 
-                                # Таблица 6: Присутствие клиентов оттока когорты в других категориях товаров (объединённая таблица)
-                                if ('category_summary_table' in st.session_state and st.session_state.category_summary_table is not None) or \
-                                   ('category_cohort_table' in st.session_state and st.session_state.category_cohort_table is not None):
-                                    
-                                    start_row = 0
-                                    worksheet_combined = None
-                                    
-                                    # Добавляем верхнюю таблицу с итоговыми метриками
-                                    if 'category_summary_table' in st.session_state and st.session_state.category_summary_table is not None:
-                                        summary_table_excel = st.session_state.category_summary_table.copy()
-                                        summary_table_excel.index.name = 'Метрика / Когорта'
-                                        summary_table_excel.to_excel(writer, sheet_name="6. Присутствие в других категориях", startrow=start_row, index=True)
-                                        worksheet_combined = writer.sheets["6. Присутствие в других категориях"]
-                                        
-                                        # Форматируем верхнюю таблицу
-                                        for row_idx in range(start_row + 2, start_row + len(summary_table_excel.index) + 2):
-                                            for col_idx in range(2, len(summary_table_excel.columns) + 2):
-                                                cell = worksheet_combined.cell(row=row_idx, column=col_idx)
-                                                cell.alignment = ExcelAlignment(horizontal="center", vertical="center")
-                                                row_name = summary_table_excel.index[row_idx - start_row - 2]
-                                                
-                                                if cell.value is not None and not isinstance(cell.value, str):
-                                                    if row_name == 'Доля оттока из сети от когорты':
-                                                        # Процентная колонка - конвертируем из процентов в долю
-                                                        cell.value = float(cell.value) / 100.0
-                                                        cell.number_format = '0.0%'
-                                                    else:
-                                                        # Числовые колонки
-                                                        cell.number_format = '0'  # Формат целого числа
-                                        
-                                        # Форматируем заголовок строки верхней таблицы
-                                        for row_idx in range(start_row + 2, start_row + len(summary_table_excel.index) + 2):
-                                            cell = worksheet_combined.cell(row=row_idx, column=1)
-                                            cell.alignment = ExcelAlignment(horizontal="left", vertical="center")
-                                        
-                                        # Обновляем начальную строку для следующей таблицы (верхняя таблица + 2 пустые строки)
-                                        start_row = start_row + len(summary_table_excel.index) + 3
-                                    
-                                    # Добавляем таблицу с разрезом по категориям
-                                    if 'category_cohort_table' in st.session_state and st.session_state.category_cohort_table is not None:
-                                        category_table_excel = st.session_state.category_cohort_table.copy()
-                                        category_table_excel.index.name = 'Категория / Когорта'
-                                        
-                                        if worksheet_combined is None:
-                                            # Если верхней таблицы не было, создаём новый лист
-                                            category_table_excel.to_excel(writer, sheet_name="6. Присутствие в других категориях", startrow=start_row, index=True)
-                                            worksheet_combined = writer.sheets["6. Присутствие в других категориях"]
-                                        else:
-                                            # Записываем вторую таблицу на тот же лист
-                                            category_table_excel.to_excel(writer, sheet_name="6. Присутствие в других категориях", startrow=start_row, index=True)
-                                        
-                                        # Форматируем таблицу с категориями
-                                        for row_idx in range(start_row + 2, start_row + len(category_table_excel.index) + 2):
-                                            for col_idx in range(2, len(category_table_excel.columns) + 2):
-                                                cell = worksheet_combined.cell(row=row_idx, column=col_idx)
-                                                cell.alignment = ExcelAlignment(horizontal="center", vertical="center")
-                                                if cell.value is not None and not isinstance(cell.value, str):
-                                                    cell.number_format = '0'  # Формат целого числа
-                                        
-                                        # Форматируем заголовок строки таблицы с категориями
-                                        for row_idx in range(start_row + 2, start_row + len(category_table_excel.index) + 2):
-                                            cell = worksheet_combined.cell(row=row_idx, column=1)
-                                            cell.alignment = ExcelAlignment(horizontal="left", vertical="center")
-                                
                                 # Таблица 7: Присутствие клиентов оттока когорты в других категориях товаров
                                 if 'df_categories' in st.session_state and st.session_state.df_categories is not None and \
                                    'categories_list' in st.session_state and st.session_state.categories_list is not None and \
@@ -1694,19 +1630,23 @@ if uploaded_file is not None:
                                         cohort = row['Когорта']
                                         summary_data['Отток из категории когорты %'][cohort] = row['Отток %']
                                     
-                                    # Инициализируем словари для метрик 6-9
+                                    # Инициализируем словари для метрик 6-11
                                     summary_data['Кол-во клиентов когорты в других категориях'] = {}
                                     summary_data['Кол-во клиентов когорты в других категориях %'] = {}
+                                    summary_data['Кол-во клиентов когорты в других категориях после месяца когорты'] = {}
+                                    summary_data['Кол-во клиентов когорты в других категориях после месяца когорты %'] = {}
                                     summary_data['Отток из сети'] = {}
                                     summary_data['Отток из сети %'] = {}
                                     
                                     for cohort in sorted_periods:
                                         summary_data['Кол-во клиентов когорты в других категориях'][cohort] = 0
                                         summary_data['Кол-во клиентов когорты в других категориях %'][cohort] = 0.0
+                                        summary_data['Кол-во клиентов когорты в других категориях после месяца когорты'][cohort] = 0
+                                        summary_data['Кол-во клиентов когорты в других категориях после месяца когорты %'][cohort] = 0.0
                                         summary_data['Отток из сети'][cohort] = 0
                                         summary_data['Отток из сети %'][cohort] = 0.0
                                     
-                                    # 6-9. Данные о присутствии в других категориях и оттоке из сети
+                                    # 6-11. Данные о присутствии в других категориях и оттоке из сети
                                     if 'category_summary_table' in st.session_state and st.session_state.category_summary_table is not None:
                                         category_summary = st.session_state.category_summary_table
                                         
@@ -1722,6 +1662,27 @@ if uploaded_file is not None:
                                             if cohort_size > 0:
                                                 percent = (present_count / cohort_size) * 100
                                                 summary_data['Кол-во клиентов когорты в других категориях %'][cohort] = percent
+                                        
+                                        if 'Итого присутствуют в других категориях после месяца когорты' in category_summary.index:
+                                            for cohort in sorted_periods:
+                                                if cohort in category_summary.columns:
+                                                    value = category_summary.loc['Итого присутствуют в других категориях после месяца когорты', cohort]
+                                                    summary_data['Кол-во клиентов когорты в других категориях после месяца когорты'][cohort] = int(value) if pd.notna(value) else 0
+                                        
+                                        if 'Доля присутствуют в других категориях после месяца когорты' in category_summary.index:
+                                            for cohort in sorted_periods:
+                                                if cohort in category_summary.columns:
+                                                    value = category_summary.loc['Доля присутствуют в других категориях после месяца когорты', cohort]
+                                                    if pd.notna(value):
+                                                        summary_data['Кол-во клиентов когорты в других категориях после месяца когорты %'][cohort] = value
+                                        else:
+                                            # Вычисляем процент вручную
+                                            for cohort in sorted_periods:
+                                                cohort_size = summary_data['Кол-во клиентов в когорте'].get(cohort, 0)
+                                                present_after_count = summary_data['Кол-во клиентов когорты в других категориях после месяца когорты'].get(cohort, 0)
+                                                if cohort_size > 0:
+                                                    percent = (present_after_count / cohort_size) * 100
+                                                    summary_data['Кол-во клиентов когорты в других категориях после месяца когорты %'][cohort] = percent
                                         
                                         if 'Отток из сети' in category_summary.index:
                                             for cohort in sorted_periods:
@@ -2845,6 +2806,8 @@ if uploaded_file is not None:
                                 
                                 # Рассчитываем метрики для всех когорт для сводной таблицы
                                 total_present_by_cohort = {}
+                                total_present_after_cohort_by_cohort = {}
+                                total_present_after_cohort_percent_by_cohort = {}
                                 network_churn_by_cohort = {}
                                 network_churn_percent_by_cohort = {}
                                 
@@ -2870,6 +2833,8 @@ if uploaded_file is not None:
                                     # Определяем периоды начиная с этой когорты
                                     cohort_index_cohort = sorted_periods.index(cohort_period) if cohort_period in sorted_periods else 0
                                     periods_from_cohort_cohort = sorted_periods[cohort_index_cohort:]
+                                    # Периоды ПОСЛЕ когорты (исключая период когорты)
+                                    periods_after_cohort_cohort = periods_from_cohort_cohort[1:] if len(periods_from_cohort_cohort) > 1 else []
                                     
                                     # Собираем клиентов из категорий только для периодов >= когорты
                                     all_category_clients_from_cohort = set()
@@ -2886,14 +2851,32 @@ if uploaded_file is not None:
                                     present_in_categories_cohort = churn_clients_set_cohort & all_category_clients_from_cohort
                                     total_present_by_cohort[cohort_period] = len(present_in_categories_cohort)
                                     
+                                    # Клиенты оттока, присутствующие в других категориях ПОСЛЕ месяца когорты
+                                    all_category_clients_after_cohort = set()
+                                    if year_month_col is not None and len(periods_after_cohort_cohort) > 0:
+                                        for category in categories:
+                                            category_data = df_categories[df_categories[group_col] == category]
+                                            category_data_filtered = category_data[category_data[year_month_col].isin(periods_after_cohort_cohort)]
+                                            category_clients = set(category_data_filtered[client_code_col].dropna().astype(str).unique())
+                                            all_category_clients_after_cohort.update(category_clients)
+                                    elif year_month_col is None:
+                                        all_category_clients_after_cohort = all_category_clients_all_periods
+                                    
+                                    present_in_categories_after_cohort = churn_clients_set_cohort & all_category_clients_after_cohort
+                                    total_present_after_cohort_by_cohort[cohort_period] = len(present_in_categories_after_cohort)
+                                    
+                                    # % присутствия после месяца когорты
+                                    churn_table = st.session_state.churn_table
+                                    cohort_row = churn_table[churn_table['Когорта'] == cohort_period]
+                                    cohort_size_cohort = int(cohort_row.iloc[0]['Кол-во клиентов когорты']) if not cohort_row.empty else 0
+                                    present_after_cohort_percent = (len(present_in_categories_after_cohort) / cohort_size_cohort * 100) if cohort_size_cohort > 0 else 0
+                                    total_present_after_cohort_percent_by_cohort[cohort_period] = present_after_cohort_percent
+                                    
                                     # Отток из сети = клиенты оттока, которые не появились ни в одной категории после периода когорты
                                     network_churn_cohort = len(churn_clients_set_cohort - all_category_clients_from_cohort)
                                     network_churn_by_cohort[cohort_period] = network_churn_cohort
                                     
                                     # % оттока из сети
-                                    churn_table = st.session_state.churn_table
-                                    cohort_row = churn_table[churn_table['Когорта'] == cohort_period]
-                                    cohort_size_cohort = int(cohort_row.iloc[0]['Кол-во клиентов когорты']) if not cohort_row.empty else 0
                                     network_churn_percent_cohort = (network_churn_cohort / cohort_size_cohort * 100) if cohort_size_cohort > 0 else 0
                                     network_churn_percent_by_cohort[cohort_period] = network_churn_percent_cohort
                                 
@@ -2971,11 +2954,29 @@ if uploaded_file is not None:
                                     present_in_categories = churn_clients_set & all_category_clients
                                     present_count = len(present_in_categories)
                                     
+                                    # Клиенты оттока, присутствующие в других категориях ПОСЛЕ месяца когорты (исключая период когорты)
+                                    periods_after_cohort = periods_from_cohort[1:] if len(periods_from_cohort) > 1 else []
+                                    all_category_clients_after_cohort = set()
+                                    if year_month_col is not None and len(periods_after_cohort) > 0:
+                                        # Используем только данные из периодов ПОСЛЕ выбранной когорты
+                                        for category in categories:
+                                            category_data = df_categories[df_categories[group_col] == category]
+                                            # Фильтруем только периоды ПОСЛЕ выбранной когорты
+                                            category_data_filtered = category_data[category_data[year_month_col].isin(periods_after_cohort)]
+                                            category_clients = set(category_data_filtered[client_code_col].dropna().astype(str).unique())
+                                            all_category_clients_after_cohort.update(category_clients)
+                                    elif year_month_col is None:
+                                        # Если нет столбца "Год-месяц", используем все данные (но это не совсем правильно)
+                                        all_category_clients_after_cohort = all_category_clients
+                                    
+                                    present_in_categories_after_cohort = churn_clients_set & all_category_clients_after_cohort
+                                    present_count_after_cohort = len(present_in_categories_after_cohort)
+                                    
+                                    # % присутствия после месяца когорты
+                                    present_percent_after_cohort = (present_count_after_cohort / cohort_size * 100) if cohort_size > 0 else 0
+                                    
                                     # Отток из сети = клиенты оттока, которые не появились ни в одной категории после периода когорты
                                     network_churn = len(churn_clients_set - all_category_clients)
-                                    
-                                    # % оттока из сети
-                                    network_churn_percent = (network_churn / cohort_size * 100) if cohort_size > 0 else 0
                                     
                                     # Вычисляем клиентов оттока из сети (тех, кто не присутствует ни в одной категории)
                                     network_churn_clients = churn_clients_set - all_category_clients
@@ -2985,20 +2986,20 @@ if uploaded_file is not None:
                                     metrics_html = f"""
                                     <div style="line-height: 2;">
                                     <p style="color: #333; font-size: 1rem; margin: 8px 0;">
-                                        <strong style="color: #1f77b4;">Клиентов в когорте:</strong> 
-                                        <span style="color: #2c3e50; font-weight: 600;">{cohort_size}</span>
-                                    </p>
-                                    <p style="color: #333; font-size: 1rem; margin: 8px 0;">
                                         <strong style="color: #1f77b4;">Клиентов когорты присутствуют в других категориях:</strong> 
                                         <span style="color: #2c3e50; font-weight: 600;">{present_count}</span>
                                     </p>
                                     <p style="color: #333; font-size: 1rem; margin: 8px 0;">
-                                        <strong style="color: #1f77b4;">Отток из сети:</strong> 
-                                        <span style="color: #e74c3c; font-weight: 600;">{network_churn}</span>
+                                        <strong style="color: #1f77b4;">Клиентов когорты присутствуют в других категориях после месяца когорты:</strong> 
+                                        <span style="color: #2c3e50; font-weight: 600;">{present_count_after_cohort}</span>
                                     </p>
                                     <p style="color: #333; font-size: 1rem; margin: 8px 0;">
-                                        <strong style="color: #1f77b4;">% оттока из сети от клиентов когорты:</strong> 
-                                        <span style="color: #e74c3c; font-weight: 600;">{network_churn_percent:.1f}%</span>
+                                        <strong style="color: #1f77b4;">Клиентов когорты присутствуют в других категориях после месяца когорты%:</strong> 
+                                        <span style="color: #2c3e50; font-weight: 600;">{present_percent_after_cohort:.1f}%</span>
+                                    </p>
+                                    <p style="color: #333; font-size: 1rem; margin: 8px 0;">
+                                        <strong style="color: #1f77b4;">Отток из сети:</strong> 
+                                        <span style="color: #e74c3c; font-weight: 600;">{network_churn}</span>
                                     </p>
                                     </div>
                                     """
@@ -3256,19 +3257,23 @@ if uploaded_file is not None:
                             cohort = row['Когорта']
                             summary_data['Отток из категории когорты %'][cohort] = f"{row['Отток %']:.1f}%"
                         
-                        # Инициализируем словари для метрик 6-9 заранее (заполняем нулями по умолчанию)
+                        # Инициализируем словари для метрик 6-11 заранее (заполняем нулями по умолчанию)
                         summary_data['Кол-во клиентов когорты в других категориях'] = {}
                         summary_data['Кол-во клиентов когорты в других категориях %'] = {}
+                        summary_data['Кол-во клиентов когорты в других категориях после месяца когорты'] = {}
+                        summary_data['Кол-во клиентов когорты в других категориях после месяца когорты %'] = {}
                         summary_data['Отток из сети'] = {}
                         summary_data['Отток из сети %'] = {}
                         
                         for cohort in sorted_periods:
                             summary_data['Кол-во клиентов когорты в других категориях'][cohort] = 0
                             summary_data['Кол-во клиентов когорты в других категориях %'][cohort] = "0.0%"
+                            summary_data['Кол-во клиентов когорты в других категориях после месяца когорты'][cohort] = 0
+                            summary_data['Кол-во клиентов когорты в других категориях после месяца когорты %'][cohort] = "0.0%"
                             summary_data['Отток из сети'][cohort] = 0
                             summary_data['Отток из сети %'][cohort] = "0.0%"
                         
-                        # 6-9. Данные о присутствии в других категориях и оттоке из сети (если есть данные)
+                        # 6-11. Данные о присутствии в других категориях и оттоке из сети (если есть данные)
                         if 'category_summary_table' in st.session_state and st.session_state.category_summary_table is not None:
                             category_summary = st.session_state.category_summary_table
                             
@@ -3294,7 +3299,38 @@ if uploaded_file is not None:
                                 else:
                                     summary_data['Кол-во клиентов когорты в других категориях %'][cohort] = "0.0%"
                             
-                            # 8. Отток из сети (обновляем значения)
+                            # 8. Кол-во клиентов когорты в других категориях после месяца когорты (обновляем значения)
+                            if 'Итого присутствуют в других категориях после месяца когорты' in category_summary.index:
+                                for cohort in sorted_periods:
+                                    if cohort in category_summary.columns:
+                                        value = category_summary.loc['Итого присутствуют в других категориях после месяца когорты', cohort]
+                                        summary_data['Кол-во клиентов когорты в других категориях после месяца когорты'][cohort] = int(value) if pd.notna(value) else 0
+                                    else:
+                                        summary_data['Кол-во клиентов когорты в других категориях после месяца когорты'][cohort] = 0
+                            
+                            # 9. Кол-во клиентов когорты в других категориях после месяца когорты % (обновляем значения)
+                            if 'Доля присутствуют в других категориях после месяца когорты' in category_summary.index:
+                                for cohort in sorted_periods:
+                                    if cohort in category_summary.columns:
+                                        value = category_summary.loc['Доля присутствуют в других категориях после месяца когорты', cohort]
+                                        if pd.notna(value):
+                                            summary_data['Кол-во клиентов когорты в других категориях после месяца когорты %'][cohort] = f"{value:.1f}%"
+                                        else:
+                                            summary_data['Кол-во клиентов когорты в других категориях после месяца когорты %'][cohort] = "0.0%"
+                                    else:
+                                        summary_data['Кол-во клиентов когорты в других категориях после месяца когорты %'][cohort] = "0.0%"
+                            else:
+                                # Вычисляем процент вручную
+                                for cohort in sorted_periods:
+                                    cohort_size = summary_data['Кол-во клиентов в когорте'].get(cohort, 0)
+                                    present_after_count = summary_data['Кол-во клиентов когорты в других категориях после месяца когорты'].get(cohort, 0)
+                                    if cohort_size > 0:
+                                        percent = (present_after_count / cohort_size) * 100
+                                        summary_data['Кол-во клиентов когорты в других категориях после месяца когорты %'][cohort] = f"{percent:.1f}%"
+                                    else:
+                                        summary_data['Кол-во клиентов когорты в других категориях после месяца когорты %'][cohort] = "0.0%"
+                            
+                            # 10. Отток из сети (обновляем значения)
                             if 'Отток из сети' in category_summary.index:
                                 for cohort in sorted_periods:
                                     if cohort in category_summary.columns:
@@ -3306,7 +3342,7 @@ if uploaded_file is not None:
                                 for cohort in sorted_periods:
                                     summary_data['Отток из сети'][cohort] = 0
                             
-                            # 9. Отток из сети % (обновляем значения)
+                            # 11. Отток из сети % (обновляем значения)
                             if 'Доля оттока из сети от когорты' in category_summary.index:
                                 for cohort in sorted_periods:
                                     if cohort in category_summary.columns:
