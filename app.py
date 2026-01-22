@@ -1617,9 +1617,9 @@ if uploaded_file is not None:
                                 # Удаляем пустой лист по умолчанию
                                 if 'Sheet' in workbook.sheetnames:
                                     workbook.remove(workbook['Sheet'])
-                            
-                            buffer.seek(0)
-                            return buffer.getvalue()
+                        
+                        buffer.seek(0)
+                        return buffer.getvalue()
                         
                         # CSS для увеличения размера кнопок загрузки
                         st.markdown("""
