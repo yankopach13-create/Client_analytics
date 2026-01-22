@@ -846,9 +846,11 @@ def get_accumulation_clients(df, year_month_col, client_col, sorted_periods, coh
     
     return sorted(list(returned_clients))
 
-def get_churn_clients(df, year_month_col, client_col, sorted_periods, cohort_period, period_clients_cache=None):
+def get_churn_clients(df, year_month_col, client_col, sorted_periods, cohort_period, period_clients_cache=None, period_indices=None):
     """Получает коды клиентов оттока из когорты (те, кто не вернулся ни разу после периода когорты)"""
-    period_indices = {period: idx for idx, period in enumerate(sorted_periods)}
+    # Оптимизация: используем переданный period_indices или создаем один раз
+    if period_indices is None:
+        period_indices = {period: idx for idx, period in enumerate(sorted_periods)}
     cohort_idx = period_indices.get(cohort_period, -1)
     
     if cohort_idx < 0:
@@ -1485,10 +1487,13 @@ if uploaded_file is not None:
                                         
                                         start_row_cohorts = start_row_cohorts + len(category_table_excel.index) + 3
                                     
+                                    # Оптимизация: создаем period_indices один раз
+                                    period_indices = {period: idx for idx, period in enumerate(sorted_periods)}
+                                    
                                     # Для каждой когорты создаем таблицу
                                     for cohort_idx, selected_cohort in enumerate(sorted_periods):
-                                        # Определяем периоды начиная с выбранной когорты
-                                        cohort_index = sorted_periods.index(selected_cohort) if selected_cohort in sorted_periods else 0
+                                        # Определяем периоды начиная с выбранной когорты (используем словарь)
+                                        cohort_index = period_indices.get(selected_cohort, 0)
                                         periods_from_cohort = sorted_periods[cohort_index:]
                                         
                                         # Получаем клиентов оттока для выбранной когорты
@@ -1647,35 +1652,38 @@ if uploaded_file is not None:
                                     # Создаем сводную таблицу (та же логика, что и в интерфейсе)
                                     summary_data = {}
                                     
+                                    # Оптимизация: создаем словари из DataFrame одним проходом вместо множественных iterrows()
+                                    churn_table_dict = churn_table.set_index('Когорта').to_dict('index')
+                                    
                                     # 1. Кол-во клиентов в когорте
-                                    summary_data['Кол-во клиентов в когорте'] = {}
-                                    for _, row in churn_table.iterrows():
-                                        cohort = row['Когорта']
-                                        summary_data['Кол-во клиентов в когорте'][cohort] = int(row['Кол-во клиентов когорты'])
+                                    summary_data['Кол-во клиентов в когорте'] = {
+                                        cohort: int(churn_table_dict[cohort]['Кол-во клиентов когорты'])
+                                        for cohort in sorted_periods if cohort in churn_table_dict
+                                    }
                                     
                                     # 2. Накопительное кол-во вернувшихся в категорию
-                                    summary_data['Накопительное кол-во вернувшихся в категорию'] = {}
-                                    for _, row in churn_table.iterrows():
-                                        cohort = row['Когорта']
-                                        summary_data['Накопительное кол-во вернувшихся в категорию'][cohort] = int(row['Накопительное кол-во возврата'])
+                                    summary_data['Накопительное кол-во вернувшихся в категорию'] = {
+                                        cohort: int(churn_table_dict[cohort]['Накопительное кол-во возврата'])
+                                        for cohort in sorted_periods if cohort in churn_table_dict
+                                    }
                                     
                                     # 3. Накопительное кол-во вернувшихся в категорию %
-                                    summary_data['Накопительное кол-во вернувшихся в категорию %'] = {}
-                                    for _, row in churn_table.iterrows():
-                                        cohort = row['Когорта']
-                                        summary_data['Накопительное кол-во вернувшихся в категорию %'][cohort] = row['Накопительный % возврата']
+                                    summary_data['Накопительное кол-во вернувшихся в категорию %'] = {
+                                        cohort: churn_table_dict[cohort]['Накопительный % возврата']
+                                        for cohort in sorted_periods if cohort in churn_table_dict
+                                    }
                                     
                                     # 4. Отток из категории когорты
-                                    summary_data['Отток из категории когорты'] = {}
-                                    for _, row in churn_table.iterrows():
-                                        cohort = row['Когорта']
-                                        summary_data['Отток из категории когорты'][cohort] = int(row['Отток кол-во'])
+                                    summary_data['Отток из категории когорты'] = {
+                                        cohort: int(churn_table_dict[cohort]['Отток кол-во'])
+                                        for cohort in sorted_periods if cohort in churn_table_dict
+                                    }
                                     
                                     # 5. Отток из категории когорты %
-                                    summary_data['Отток из категории когорты %'] = {}
-                                    for _, row in churn_table.iterrows():
-                                        cohort = row['Когорта']
-                                        summary_data['Отток из категории когорты %'][cohort] = row['Отток %']
+                                    summary_data['Отток из категории когорты %'] = {
+                                        cohort: churn_table_dict[cohort]['Отток %']
+                                        for cohort in sorted_periods if cohort in churn_table_dict
+                                    }
                                     
                                     # Инициализируем словари для метрик 6-11
                                     summary_data['Кол-во клиентов когорты в других категориях'] = {}
@@ -2876,14 +2884,26 @@ if uploaded_file is not None:
                                             if 'all' in category_period_index[category]:
                                                 all_category_clients_all_periods.update(category_period_index[category]['all'])
                                 
+                                # Оптимизация: создаем period_indices один раз и кэш для churn_clients
+                                period_indices = {period: idx for idx, period in enumerate(sorted_periods)}
+                                churn_clients_cache = {}
+                                
+                                # Создаем словарь для быстрого доступа к churn_table
+                                churn_table_dict = st.session_state.churn_table.set_index('Когорта').to_dict('index')
+                                
                                 # Для каждой когорты рассчитываем метрики
                                 for cohort_period in sorted_periods:
-                                    # Получаем клиентов оттока для этой когорты
-                                    churn_clients_set_cohort = set(get_churn_clients(df, year_month_col, client_col, sorted_periods, cohort_period, period_clients_cache))
-                                    churn_clients_set_cohort = {str(client) for client in churn_clients_set_cohort}
+                                    # Получаем клиентов оттока для этой когорты (с кэшированием)
+                                    if cohort_period not in churn_clients_cache:
+                                        churn_clients_list = get_churn_clients(
+                                            df, year_month_col, client_col, sorted_periods, 
+                                            cohort_period, period_clients_cache, period_indices
+                                        )
+                                        churn_clients_cache[cohort_period] = {str(client) for client in churn_clients_list}
+                                    churn_clients_set_cohort = churn_clients_cache[cohort_period]
                                     
-                                    # Определяем периоды начиная с этой когорты
-                                    cohort_index_cohort = sorted_periods.index(cohort_period) if cohort_period in sorted_periods else 0
+                                    # Определяем периоды начиная с этой когорты (используем словарь)
+                                    cohort_index_cohort = period_indices.get(cohort_period, 0)
                                     periods_from_cohort_cohort = sorted_periods[cohort_index_cohort:]
                                     # Периоды ПОСЛЕ когорты (исключая период когорты)
                                     periods_after_cohort_cohort = periods_from_cohort_cohort[1:] if len(periods_from_cohort_cohort) > 1 else []
@@ -2921,10 +2941,8 @@ if uploaded_file is not None:
                                     present_in_categories_after_cohort = churn_clients_set_cohort & all_category_clients_after_cohort
                                     total_present_after_cohort_by_cohort[cohort_period] = len(present_in_categories_after_cohort)
                                     
-                                    # % присутствия после месяца когорты
-                                    churn_table = st.session_state.churn_table
-                                    cohort_row = churn_table[churn_table['Когорта'] == cohort_period]
-                                    cohort_size_cohort = int(cohort_row.iloc[0]['Кол-во клиентов когорты']) if not cohort_row.empty else 0
+                                    # % присутствия после месяца когорты (используем словарь)
+                                    cohort_size_cohort = int(churn_table_dict[cohort_period]['Кол-во клиентов когорты']) if cohort_period in churn_table_dict else 0
                                     present_after_cohort_percent = (len(present_in_categories_after_cohort) / cohort_size_cohort * 100) if cohort_size_cohort > 0 else 0
                                     total_present_after_cohort_percent_by_cohort[cohort_period] = present_after_cohort_percent
                                     
@@ -2977,18 +2995,25 @@ if uploaded_file is not None:
                                         key="category_cohort_select"
                                     )
                                     
-                                    # Определяем периоды начиная с выбранной когорты
-                                    cohort_index = sorted_periods.index(selected_cohort) if selected_cohort in sorted_periods else 0
+                                    # Оптимизация: используем словари для быстрого доступа
+                                    period_indices = {period: idx for idx, period in enumerate(sorted_periods)}
+                                    cohort_index = period_indices.get(selected_cohort, 0)
                                     periods_from_cohort = sorted_periods[cohort_index:]
-                                    # Получаем клиентов оттока для выбранной когорты
-                                    churn_clients_set = set(get_churn_clients(df, year_month_col, client_col, sorted_periods, selected_cohort, period_clients_cache))
-                                    churn_clients_set = {str(client) for client in churn_clients_set}
                                     
-                                    # Получаем размер когорты и отток из churn_table
-                                    churn_table = st.session_state.churn_table
-                                    cohort_row = churn_table[churn_table['Когорта'] == selected_cohort]
-                                    cohort_size = int(cohort_row.iloc[0]['Кол-во клиентов когорты']) if not cohort_row.empty else 0
-                                    churn_count = int(cohort_row.iloc[0]['Отток кол-во']) if not cohort_row.empty else 0
+                                    # Получаем клиентов оттока для выбранной когорты (с кэшированием)
+                                    churn_clients_cache_key = f"churn_clients_{selected_cohort}"
+                                    if churn_clients_cache_key not in st.session_state:
+                                        churn_clients_list = get_churn_clients(
+                                            df, year_month_col, client_col, sorted_periods, 
+                                            selected_cohort, period_clients_cache, period_indices
+                                        )
+                                        st.session_state[churn_clients_cache_key] = {str(client) for client in churn_clients_list}
+                                    churn_clients_set = st.session_state[churn_clients_cache_key]
+                                    
+                                    # Получаем размер когорты и отток из churn_table (используем словарь)
+                                    churn_table_dict = st.session_state.churn_table.set_index('Когорта').to_dict('index')
+                                    cohort_size = int(churn_table_dict[selected_cohort]['Кол-во клиентов когорты']) if selected_cohort in churn_table_dict else 0
+                                    churn_count = int(churn_table_dict[selected_cohort]['Отток кол-во']) if selected_cohort in churn_table_dict else 0
                                     
                                     # Собираем всех уникальных клиентов оттока, которые присутствуют хотя бы в одной категории
                                     # ТОЛЬКО в периодах начиная с выбранной когорты используя индекс
@@ -3082,7 +3107,8 @@ if uploaded_file is not None:
                                 
                                 with col_table:
                                     # Определяем периоды начиная с выбранной когорты (для использования в таблице)
-                                    cohort_index_table = sorted_periods.index(selected_cohort) if selected_cohort in sorted_periods else 0
+                                    # Используем уже созданный period_indices из блока выше
+                                    cohort_index_table = period_indices.get(selected_cohort, 0)
                                     periods_from_cohort = sorted_periods[cohort_index_table:]
                                     
                                     # Создаем таблицу: категории по строкам, периоды по столбцам (только начиная с выбранной когорты)
@@ -3296,35 +3322,38 @@ if uploaded_file is not None:
                         # Создаем сводную таблицу
                         summary_data = {}
                         
+                        # Оптимизация: создаем словари из DataFrame одним проходом вместо множественных iterrows()
+                        churn_table_dict = churn_table.set_index('Когорта').to_dict('index')
+                        
                         # 1. Кол-во клиентов в когорте
-                        summary_data['Кол-во клиентов в когорте'] = {}
-                        for _, row in churn_table.iterrows():
-                            cohort = row['Когорта']
-                            summary_data['Кол-во клиентов в когорте'][cohort] = int(row['Кол-во клиентов когорты'])
+                        summary_data['Кол-во клиентов в когорте'] = {
+                            cohort: int(churn_table_dict[cohort]['Кол-во клиентов когорты'])
+                            for cohort in sorted_periods if cohort in churn_table_dict
+                        }
                         
                         # 2. Накопительное кол-во вернувшихся в категорию
-                        summary_data['Накопительное кол-во вернувшихся в категорию'] = {}
-                        for _, row in churn_table.iterrows():
-                            cohort = row['Когорта']
-                            summary_data['Накопительное кол-во вернувшихся в категорию'][cohort] = int(row['Накопительное кол-во возврата'])
+                        summary_data['Накопительное кол-во вернувшихся в категорию'] = {
+                            cohort: int(churn_table_dict[cohort]['Накопительное кол-во возврата'])
+                            for cohort in sorted_periods if cohort in churn_table_dict
+                        }
                         
                         # 3. Накопительное кол-во вернувшихся в категорию %
-                        summary_data['Накопительное кол-во вернувшихся в категорию %'] = {}
-                        for _, row in churn_table.iterrows():
-                            cohort = row['Когорта']
-                            summary_data['Накопительное кол-во вернувшихся в категорию %'][cohort] = f"{row['Накопительный % возврата']:.1f}%"
+                        summary_data['Накопительное кол-во вернувшихся в категорию %'] = {
+                            cohort: f"{churn_table_dict[cohort]['Накопительный % возврата']:.1f}%"
+                            for cohort in sorted_periods if cohort in churn_table_dict
+                        }
                         
                         # 4. Отток из категории когорты
-                        summary_data['Отток из категории когорты'] = {}
-                        for _, row in churn_table.iterrows():
-                            cohort = row['Когорта']
-                            summary_data['Отток из категории когорты'][cohort] = int(row['Отток кол-во'])
+                        summary_data['Отток из категории когорты'] = {
+                            cohort: int(churn_table_dict[cohort]['Отток кол-во'])
+                            for cohort in sorted_periods if cohort in churn_table_dict
+                        }
                         
                         # 5. Отток из категории когорты %
-                        summary_data['Отток из категории когорты %'] = {}
-                        for _, row in churn_table.iterrows():
-                            cohort = row['Когорта']
-                            summary_data['Отток из категории когорты %'][cohort] = f"{row['Отток %']:.1f}%"
+                        summary_data['Отток из категории когорты %'] = {
+                            cohort: f"{churn_table_dict[cohort]['Отток %']:.1f}%"
+                            for cohort in sorted_periods if cohort in churn_table_dict
+                        }
                         
                         # Инициализируем словари для метрик 6-11 заранее (заполняем нулями по умолчанию)
                         summary_data['Кол-во клиентов когорты в других категориях'] = {}
