@@ -2410,12 +2410,23 @@ if uploaded_file is not None:
                             cohort = row['Когорта']
                             summary_data['Отток из категории когорты %'][cohort] = f"{row['Отток %']:.1f}%"
                         
+                        # Инициализируем словари для метрик 4-7 заранее (заполняем нулями по умолчанию)
+                        summary_data['Кол-во клиентов когорты в других категориях'] = {}
+                        summary_data['Кол-во клиентов когорты в других категориях %'] = {}
+                        summary_data['Отток из сети'] = {}
+                        summary_data['Отток из сети %'] = {}
+                        
+                        for cohort in sorted_periods:
+                            summary_data['Кол-во клиентов когорты в других категориях'][cohort] = 0
+                            summary_data['Кол-во клиентов когорты в других категориях %'][cohort] = "0.0%"
+                            summary_data['Отток из сети'][cohort] = 0
+                            summary_data['Отток из сети %'][cohort] = "0.0%"
+                        
                         # 4-7. Данные о присутствии в других категориях и оттоке из сети (если есть данные)
                         if 'category_summary_table' in st.session_state and st.session_state.category_summary_table is not None:
                             category_summary = st.session_state.category_summary_table
                             
-                            # 4. Кол-во клиентов когорты в других категориях
-                            summary_data['Кол-во клиентов когорты в других категориях'] = {}
+                            # 4. Кол-во клиентов когорты в других категориях (обновляем значения)
                             if 'Итого присутствуют в других категориях' in category_summary.index:
                                 for cohort in sorted_periods:
                                     if cohort in category_summary.columns:
@@ -2427,8 +2438,7 @@ if uploaded_file is not None:
                                 for cohort in sorted_periods:
                                     summary_data['Кол-во клиентов когорты в других категориях'][cohort] = 0
                             
-                            # 5. Кол-во клиентов когорты в других категориях %
-                            summary_data['Кол-во клиентов когорты в других категориях %'] = {}
+                            # 5. Кол-во клиентов когорты в других категориях % (обновляем значения)
                             for cohort in sorted_periods:
                                 cohort_size = summary_data['Кол-во клиентов в когорте'].get(cohort, 0)
                                 present_count = summary_data['Кол-во клиентов когорты в других категориях'].get(cohort, 0)
@@ -2438,8 +2448,7 @@ if uploaded_file is not None:
                                 else:
                                     summary_data['Кол-во клиентов когорты в других категориях %'][cohort] = "0.0%"
                             
-                            # 6. Отток из сети
-                            summary_data['Отток из сети'] = {}
+                            # 6. Отток из сети (обновляем значения)
                             if 'Отток из сети' in category_summary.index:
                                 for cohort in sorted_periods:
                                     if cohort in category_summary.columns:
@@ -2451,8 +2460,7 @@ if uploaded_file is not None:
                                 for cohort in sorted_periods:
                                     summary_data['Отток из сети'][cohort] = 0
                             
-                            # 7. Отток из сети %
-                            summary_data['Отток из сети %'] = {}
+                            # 7. Отток из сети % (обновляем значения)
                             if 'Доля оттока из сети от когорты' in category_summary.index:
                                 for cohort in sorted_periods:
                                     if cohort in category_summary.columns:
@@ -2464,6 +2472,7 @@ if uploaded_file is not None:
                                     else:
                                         summary_data['Отток из сети %'][cohort] = "0.0%"
                             else:
+                                # Если нет строки "Доля оттока из сети от когорты", вычисляем процент вручную
                                 for cohort in sorted_periods:
                                     cohort_size = summary_data['Кол-во клиентов в когорте'].get(cohort, 0)
                                     network_churn = summary_data['Отток из сети'].get(cohort, 0)
@@ -2472,13 +2481,7 @@ if uploaded_file is not None:
                                         summary_data['Отток из сети %'][cohort] = f"{percent:.1f}%"
                                     else:
                                         summary_data['Отток из сети %'][cohort] = "0.0%"
-                        else:
-                            # Если нет данных о категориях, заполняем нулями
-                            for cohort in sorted_periods:
-                                summary_data['Кол-во клиентов когорты в других категориях'][cohort] = 0
-                                summary_data['Кол-во клиентов когорты в других категориях %'][cohort] = "0.0%"
-                                summary_data['Отток из сети'][cohort] = 0
-                                summary_data['Отток из сети %'][cohort] = "0.0%"
+                        # Если нет данных о категориях, значения уже заполнены нулями при инициализации выше
                         
                         # Создаем DataFrame
                         summary_df = pd.DataFrame(summary_data, index=sorted_periods).T
