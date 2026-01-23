@@ -126,8 +126,8 @@ def parse_period(period_str):
             if 1 <= week <= 53:
                 return (year, week, 1)  # 1 = неделя
         
-        # Пытаемся распарсить как неделю в формате "2024-неделя01", "2024-неделя1"
-        match_week_word = re.match(r'(\d{4})[-_]?неделя(\d{1,2})', period_str.lower())
+        # Пытаемся распарсить как неделю в формате "2024-неделя01", "2024-неделя1", "2024-неделя-01"
+        match_week_word = re.match(r'(\d{4})[-_]?неделя[-_]?(\d{1,2})', period_str.lower())
         if match_week_word:
             year = int(match_week_word.group(1))
             week = int(match_week_word.group(2))
@@ -1205,10 +1205,11 @@ if uploaded_file is not None:
         year_month_col = None
         client_col = None
         
-        # Ищем столбец с периодом (год-месяц или год-неделя)
+        # Ищем столбец с периодом (год-месяц, год-неделя или неделя)
         for col in df.columns:
             col_lower = str(col).lower()
-            if 'год' in col_lower and ('месяц' in col_lower or 'неделя' in col_lower or 'неделя' in col_lower):
+            if ('год' in col_lower and ('месяц' in col_lower or 'неделя' in col_lower)) or \
+               (col_lower == 'неделя' or col_lower.startswith('неделя')):
                 year_month_col = col
                 break
         
@@ -2883,19 +2884,22 @@ if uploaded_file is not None:
                                     group_col = col
                                     break
                             
-                            # Ищем столбец Год-месяц
+                            # Ищем столбец Год-месяц, Год-неделя или Неделя
                             for col in df_categories.columns:
                                 col_lower = str(col).lower().strip()
-                                if ('год' in col_lower and 'месяц' in col_lower) or ('год-месяц' in col_lower):
+                                if ('год' in col_lower and ('месяц' in col_lower or 'неделя' in col_lower)) or \
+                                   ('год-месяц' in col_lower) or ('год-неделя' in col_lower) or \
+                                   (col_lower == 'неделя' or (col_lower.startswith('неделя') and len(col_lower.split()) == 1)):
                                     year_month_col = col
                                     break
                             
-                            # Ищем столбец месяц
-                            for col in df_categories.columns:
-                                col_lower = str(col).lower().strip()
-                                if col_lower == 'месяц' or (col_lower.startswith('месяц') and len(col_lower.split()) == 1):
-                                    month_col = col
-                                    break
+                            # Ищем столбец месяц (если не нашли год-месяц)
+                            if year_month_col is None:
+                                for col in df_categories.columns:
+                                    col_lower = str(col).lower().strip()
+                                    if col_lower == 'месяц' or (col_lower.startswith('месяц') and len(col_lower.split()) == 1):
+                                        month_col = col
+                                        break
                             
                             # Ищем столбец Клиентов
                             for col in df_categories.columns:
@@ -2917,7 +2921,7 @@ if uploaded_file is not None:
                             elif client_code_col is None:
                                 st.error("❌ Не найден столбец 'Код клиента'. Убедитесь, что в файле есть столбец с названием, содержащим 'Код' и 'клиент'.")
                             elif year_month_col is None:
-                                st.warning("⚠️ Не найден столбец 'Год-месяц'. Данные будут обработаны без фильтрации по периоду.")
+                                st.warning("⚠️ Не найден столбец с периодом ('Год-месяц', 'Год-неделя' или 'Неделя'). Данные будут обработаны без фильтрации по периоду.")
                             else:
                                 # Получаем уникальные категории
                                 categories = df_categories[group_col].dropna().unique()
