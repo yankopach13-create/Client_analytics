@@ -1651,172 +1651,238 @@ if uploaded_file is not None:
                                    'group_col_name' in st.session_state and st.session_state.group_col_name is not None and \
                                    'year_month_col_name' in st.session_state and 'client_code_col_name' in st.session_state:
                                     
-                                    df_categories = st.session_state.df_categories
-                                    categories = st.session_state.categories_list
-                                    group_col = st.session_state.group_col_name
-                                    year_month_col_cat = st.session_state.get('year_month_col_name', None)
-                                    client_code_col = st.session_state.get('client_code_col_name', None)
-                                    
-                                    start_row_churn = 0
-                                    worksheet_churn = None
-                                    
-                                    # Оптимизация: создаем period_indices один раз
-                                    period_indices = {period: idx for idx, period in enumerate(sorted_periods)}
-                                    
-                                    # Для каждой когорты создаем таблицу присутствия клиентов оттока
-                                    for cohort_idx, selected_cohort in enumerate(sorted_periods):
-                                        # Определяем периоды начиная с выбранной когорты
-                                        cohort_index = period_indices.get(selected_cohort, 0)
-                                        periods_from_cohort = sorted_periods[cohort_index:]
+                                    # Используем сохраненные таблицы из session_state, если они есть
+                                    if 'churn_presence_tables' in st.session_state and st.session_state.churn_presence_tables is not None:
+                                        churn_presence_tables = st.session_state.churn_presence_tables
                                         
-                                        # Получаем клиентов оттока для выбранной когорты
-                                        period_clients_cache = st.session_state.get('period_clients_cache', None)
-                                        churn_clients_set = set(get_churn_clients(df, year_month_col, client_col, sorted_periods, selected_cohort, period_clients_cache))
-                                        churn_clients_set = {str(client) for client in churn_clients_set}
+                                        start_row_churn = 0
+                                        worksheet_churn = None
                                         
-                                        # Создаем таблицу: категории по строкам, периоды по столбцам
-                                        category_period_table = pd.DataFrame(index=categories, columns=periods_from_cohort)
+                                        # Для каждой когорты записываем сохраненную таблицу
+                                        for selected_cohort in sorted_periods:
+                                            if selected_cohort in churn_presence_tables:
+                                                category_period_table_with_totals = churn_presence_tables[selected_cohort]
+                                                new_columns = category_period_table_with_totals.columns.tolist()
+                                                
+                                                # Добавляем заголовок когорты
+                                                if worksheet_churn is None:
+                                                    # Создаем новый лист
+                                                    category_period_table_with_totals.to_excel(
+                                                        writer, 
+                                                        sheet_name="6. Присутствие клиентов оттока в других категориях", 
+                                                        startrow=start_row_churn, 
+                                                        index=True
+                                                    )
+                                                    worksheet_churn = writer.sheets["6. Присутствие клиентов оттока в других категориях"]
+                                                    # Добавляем заголовок когорты
+                                                    last_col_letter = get_column_letter(len(new_columns) + 1)
+                                                    worksheet_churn.cell(row=start_row_churn + 1, column=1, value=f"Когорта: {selected_cohort}")
+                                                    worksheet_churn.merge_cells(f'A{start_row_churn + 1}:{last_col_letter}{start_row_churn + 1}')
+                                                    header_cell = worksheet_churn.cell(row=start_row_churn + 1, column=1)
+                                                    header_cell.font = Font(bold=True, size=12)
+                                                    header_cell.alignment = ExcelAlignment(horizontal="center", vertical="center")
+                                                    start_row_churn += 2
+                                                else:
+                                                    # Добавляем заголовок когорты
+                                                    last_col_letter = get_column_letter(len(new_columns) + 1)
+                                                    worksheet_churn.cell(row=start_row_churn + 1, column=1, value=f"Когорта: {selected_cohort}")
+                                                    worksheet_churn.merge_cells(f'A{start_row_churn + 1}:{last_col_letter}{start_row_churn + 1}')
+                                                    header_cell = worksheet_churn.cell(row=start_row_churn + 1, column=1)
+                                                    header_cell.font = Font(bold=True, size=12)
+                                                    header_cell.alignment = ExcelAlignment(horizontal="center", vertical="center")
+                                                    start_row_churn += 2
+                                                    
+                                                    # Записываем таблицу на тот же лист
+                                                    category_period_table_with_totals.to_excel(
+                                                        writer, 
+                                                        sheet_name="6. Присутствие клиентов оттока в других категориях", 
+                                                        startrow=start_row_churn, 
+                                                        index=True
+                                                    )
+                                                
+                                                # Форматируем таблицу
+                                                for row_idx in range(start_row_churn + 2, start_row_churn + len(category_period_table_with_totals.index) + 2):
+                                                    for col_idx in range(2, len(category_period_table_with_totals.columns) + 2):
+                                                        cell = worksheet_churn.cell(row=row_idx, column=col_idx)
+                                                        cell.alignment = ExcelAlignment(horizontal="center", vertical="center")
+                                                        if cell.value is not None and not isinstance(cell.value, str):
+                                                            cell.number_format = '0'
+                                                
+                                                # Форматируем заголовок строки
+                                                for row_idx in range(start_row_churn + 2, start_row_churn + len(category_period_table_with_totals.index) + 2):
+                                                    cell = worksheet_churn.cell(row=row_idx, column=1)
+                                                    cell.alignment = ExcelAlignment(horizontal="left", vertical="center")
+                                                
+                                                # Обновляем начальную строку для следующей таблицы (таблица + 2 пустые строки)
+                                                start_row_churn = start_row_churn + len(category_period_table_with_totals.index) + 3
+                                    else:
+                                        # Если сохраненных таблиц нет, создаем их заново (fallback)
+                                        df_categories = st.session_state.df_categories
+                                        categories = st.session_state.categories_list
+                                        group_col = st.session_state.group_col_name
+                                        year_month_col_cat = st.session_state.get('year_month_col_name', None)
+                                        client_code_col = st.session_state.get('client_code_col_name', None)
                                         
-                                        # Словари для итогов
-                                        period_unique_clients = {period: set() for period in periods_from_cohort}
-                                        category_unique_clients = {category: set() for category in categories}
+                                        start_row_churn = 0
+                                        worksheet_churn = None
                                         
-                                        # Если есть столбец "Год-месяц", используем индекс для оптимизации
-                                        if year_month_col_cat is not None:
-                                            # Используем индекс категорий для быстрого доступа
+                                        # Оптимизация: создаем period_indices один раз
+                                        period_indices = {period: idx for idx, period in enumerate(sorted_periods)}
+                                        
+                                        # Для каждой когорты создаем таблицу присутствия клиентов оттока
+                                        for cohort_idx, selected_cohort in enumerate(sorted_periods):
+                                            # Определяем периоды начиная с выбранной когорты
+                                            cohort_index = period_indices.get(selected_cohort, 0)
+                                            periods_from_cohort = sorted_periods[cohort_index:]
+                                            
+                                            # Получаем клиентов оттока для выбранной когорты
+                                            period_clients_cache = st.session_state.get('period_clients_cache', None)
+                                            churn_clients_set = set(get_churn_clients(df, year_month_col, client_col, sorted_periods, selected_cohort, period_clients_cache))
+                                            churn_clients_set = {str(client) for client in churn_clients_set}
+                                            
+                                            # Создаем таблицу: категории по строкам, периоды по столбцам
+                                            category_period_table = pd.DataFrame(index=categories, columns=periods_from_cohort)
+                                            
+                                            # Словари для итогов
+                                            period_unique_clients = {period: set() for period in periods_from_cohort}
+                                            category_unique_clients = {category: set() for category in categories}
+                                            
+                                            # Если есть столбец "Год-месяц", используем индекс для оптимизации
+                                            if year_month_col_cat is not None:
+                                                # Используем индекс категорий для быстрого доступа
+                                                category_period_index = st.session_state.get('category_period_index', None)
+                                                if category_period_index is None:
+                                                    category_period_index = create_category_period_index(
+                                                        df_categories, group_col, year_month_col_cat, client_code_col
+                                                    )
+                                                
+                                                for period in periods_from_cohort:
+                                                    for category in categories:
+                                                        # Получаем клиентов категории в этом периоде из индекса
+                                                        if category in category_period_index and period in category_period_index[category]:
+                                                            category_period_clients = category_period_index[category][period]
+                                                        else:
+                                                            category_period_clients = set()
+                                                        
+                                                        intersection = churn_clients_set & category_period_clients
+                                                        category_period_table.loc[category, period] = len(intersection)
+                                                        
+                                                        period_unique_clients[period].update(intersection)
+                                                        category_unique_clients[category].update(intersection)
+                                            else:
+                                                category_clients_dict = {}
+                                                for category in categories:
+                                                    category_data = df_categories[df_categories[group_col] == category]
+                                                    client_codes = set(category_data[client_code_col].dropna().astype(str).unique())
+                                                    category_clients_dict[category] = client_codes
+                                                
+                                                for period in periods_from_cohort:
+                                                    for category in categories:
+                                                        category_clients_set = category_clients_dict.get(category, set())
+                                                        intersection = churn_clients_set & category_clients_set
+                                                        category_period_table.loc[category, period] = len(intersection)
+                                                        
+                                                        period_unique_clients[period].update(intersection)
+                                                        category_unique_clients[category].update(intersection)
+                                            
+                                            # Заполняем NaN нулями
+                                            category_period_table = category_period_table.fillna(0).astype(int)
+                                            
+                                            # Создаем итоговую строку и столбец
+                                            totals_row = pd.Series(
+                                                {period: len(period_unique_clients[period]) for period in periods_from_cohort},
+                                                name='Итого клиентов'
+                                            )
+                                            
+                                            totals_col = pd.Series(
+                                                {category: len(category_unique_clients[category]) for category in categories},
+                                                name='Итого'
+                                            )
+                                            
+                                            # Добавляем итоги в таблицу
+                                            category_period_table_with_totals = category_period_table.copy()
+                                            category_period_table_with_totals.loc['Итого клиентов'] = totals_row
+                                            category_period_table_with_totals['Итого'] = totals_col
+                                            
+                                            # Вычисляем значение для ячейки пересечения
+                                            all_category_clients = set()
                                             category_period_index = st.session_state.get('category_period_index', None)
                                             if category_period_index is None:
                                                 category_period_index = create_category_period_index(
                                                     df_categories, group_col, year_month_col_cat, client_code_col
                                                 )
                                             
-                                            for period in periods_from_cohort:
+                                            if year_month_col_cat is not None:
                                                 for category in categories:
-                                                    # Получаем клиентов категории в этом периоде из индекса
-                                                    if category in category_period_index and period in category_period_index[category]:
-                                                        category_period_clients = category_period_index[category][period]
-                                                    else:
-                                                        category_period_clients = set()
-                                                    
-                                                    intersection = churn_clients_set & category_period_clients
-                                                    category_period_table.loc[category, period] = len(intersection)
-                                                    
-                                                    period_unique_clients[period].update(intersection)
-                                                    category_unique_clients[category].update(intersection)
-                                        else:
-                                            category_clients_dict = {}
-                                            for category in categories:
-                                                category_data = df_categories[df_categories[group_col] == category]
-                                                client_codes = set(category_data[client_code_col].dropna().astype(str).unique())
-                                                category_clients_dict[category] = client_codes
-                                            
-                                            for period in periods_from_cohort:
+                                                    if category in category_period_index:
+                                                        for period in periods_from_cohort:
+                                                            if period in category_period_index[category]:
+                                                                all_category_clients.update(category_period_index[category][period])
+                                            else:
                                                 for category in categories:
-                                                    category_clients_set = category_clients_dict.get(category, set())
-                                                    intersection = churn_clients_set & category_clients_set
-                                                    category_period_table.loc[category, period] = len(intersection)
-                                                    
-                                                    period_unique_clients[period].update(intersection)
-                                                    category_unique_clients[category].update(intersection)
-                                        
-                                        # Заполняем NaN нулями
-                                        category_period_table = category_period_table.fillna(0).astype(int)
-                                        
-                                        # Создаем итоговую строку и столбец
-                                        totals_row = pd.Series(
-                                            {period: len(period_unique_clients[period]) for period in periods_from_cohort},
-                                            name='Итого клиентов'
-                                        )
-                                        
-                                        totals_col = pd.Series(
-                                            {category: len(category_unique_clients[category]) for category in categories},
-                                            name='Итого'
-                                        )
-                                        
-                                        # Добавляем итоги в таблицу
-                                        category_period_table_with_totals = category_period_table.copy()
-                                        category_period_table_with_totals.loc['Итого клиентов'] = totals_row
-                                        category_period_table_with_totals['Итого'] = totals_col
-                                        
-                                        # Вычисляем значение для ячейки пересечения
-                                        all_category_clients = set()
-                                        category_period_index = st.session_state.get('category_period_index', None)
-                                        if category_period_index is None:
-                                            category_period_index = create_category_period_index(
-                                                df_categories, group_col, year_month_col_cat, client_code_col
-                                            )
-                                        
-                                        if year_month_col_cat is not None:
-                                            for category in categories:
-                                                if category in category_period_index:
-                                                    for period in periods_from_cohort:
-                                                        if period in category_period_index[category]:
-                                                            all_category_clients.update(category_period_index[category][period])
-                                        else:
-                                            for category in categories:
-                                                if category in category_period_index and 'all' in category_period_index[category]:
-                                                    all_category_clients.update(category_period_index[category]['all'])
-                                        
-                                        present_in_categories = churn_clients_set & all_category_clients
-                                        category_period_table_with_totals.loc['Итого клиентов', 'Итого'] = len(present_in_categories)
-                                        
-                                        # Переупорядочиваем строки и столбцы
-                                        new_index = ['Итого клиентов'] + [cat for cat in categories]
-                                        category_period_table_with_totals = category_period_table_with_totals.reindex(new_index)
-                                        new_columns = ['Итого'] + list(periods_from_cohort)
-                                        category_period_table_with_totals = category_period_table_with_totals[new_columns]
-                                        
-                                        # Добавляем заголовок когорты
-                                        if worksheet_churn is None:
-                                            # Создаем новый лист
-                                            category_period_table_with_totals.to_excel(
-                                                writer, 
-                                                sheet_name="6. Присутствие клиентов оттока в других категориях", 
-                                                startrow=start_row_churn, 
-                                                index=True
-                                            )
-                                            worksheet_churn = writer.sheets["6. Присутствие клиентов оттока в других категориях"]
-                                            # Добавляем заголовок когорты
-                                            last_col_letter = get_column_letter(len(new_columns) + 1)
-                                            worksheet_churn.cell(row=start_row_churn + 1, column=1, value=f"Когорта: {selected_cohort}")
-                                            worksheet_churn.merge_cells(f'A{start_row_churn + 1}:{last_col_letter}{start_row_churn + 1}')
-                                            header_cell = worksheet_churn.cell(row=start_row_churn + 1, column=1)
-                                            header_cell.font = Font(bold=True, size=12)
-                                            header_cell.alignment = ExcelAlignment(horizontal="center", vertical="center")
-                                            start_row_churn += 2
-                                        else:
-                                            # Добавляем заголовок когорты
-                                            last_col_letter = get_column_letter(len(new_columns) + 1)
-                                            worksheet_churn.cell(row=start_row_churn + 1, column=1, value=f"Когорта: {selected_cohort}")
-                                            worksheet_churn.merge_cells(f'A{start_row_churn + 1}:{last_col_letter}{start_row_churn + 1}')
-                                            header_cell = worksheet_churn.cell(row=start_row_churn + 1, column=1)
-                                            header_cell.font = Font(bold=True, size=12)
-                                            header_cell.alignment = ExcelAlignment(horizontal="center", vertical="center")
-                                            start_row_churn += 2
+                                                    if category in category_period_index and 'all' in category_period_index[category]:
+                                                        all_category_clients.update(category_period_index[category]['all'])
                                             
-                                            # Записываем таблицу на тот же лист
-                                            category_period_table_with_totals.to_excel(
-                                                writer, 
-                                                sheet_name="6. Присутствие клиентов оттока в других категориях", 
-                                                startrow=start_row_churn, 
-                                                index=True
-                                            )
-                                        
-                                        # Форматируем таблицу
-                                        for row_idx in range(start_row_churn + 2, start_row_churn + len(category_period_table_with_totals.index) + 2):
-                                            for col_idx in range(2, len(category_period_table_with_totals.columns) + 2):
-                                                cell = worksheet_churn.cell(row=row_idx, column=col_idx)
-                                                cell.alignment = ExcelAlignment(horizontal="center", vertical="center")
-                                                if cell.value is not None and not isinstance(cell.value, str):
-                                                    cell.number_format = '0'
-                                        
-                                        # Форматируем заголовок строки
-                                        for row_idx in range(start_row_churn + 2, start_row_churn + len(category_period_table_with_totals.index) + 2):
-                                            cell = worksheet_churn.cell(row=row_idx, column=1)
-                                            cell.alignment = ExcelAlignment(horizontal="left", vertical="center")
-                                        
-                                        # Обновляем начальную строку для следующей таблицы (таблица + 2 пустые строки)
-                                        start_row_churn = start_row_churn + len(category_period_table_with_totals.index) + 3
+                                            present_in_categories = churn_clients_set & all_category_clients
+                                            category_period_table_with_totals.loc['Итого клиентов', 'Итого'] = len(present_in_categories)
+                                            
+                                            # Переупорядочиваем строки и столбцы
+                                            new_index = ['Итого клиентов'] + [cat for cat in categories]
+                                            category_period_table_with_totals = category_period_table_with_totals.reindex(new_index)
+                                            new_columns = ['Итого'] + list(periods_from_cohort)
+                                            category_period_table_with_totals = category_period_table_with_totals[new_columns]
+                                            
+                                            # Добавляем заголовок когорты
+                                            if worksheet_churn is None:
+                                                # Создаем новый лист
+                                                category_period_table_with_totals.to_excel(
+                                                    writer, 
+                                                    sheet_name="6. Присутствие клиентов оттока в других категориях", 
+                                                    startrow=start_row_churn, 
+                                                    index=True
+                                                )
+                                                worksheet_churn = writer.sheets["6. Присутствие клиентов оттока в других категориях"]
+                                                # Добавляем заголовок когорты
+                                                last_col_letter = get_column_letter(len(new_columns) + 1)
+                                                worksheet_churn.cell(row=start_row_churn + 1, column=1, value=f"Когорта: {selected_cohort}")
+                                                worksheet_churn.merge_cells(f'A{start_row_churn + 1}:{last_col_letter}{start_row_churn + 1}')
+                                                header_cell = worksheet_churn.cell(row=start_row_churn + 1, column=1)
+                                                header_cell.font = Font(bold=True, size=12)
+                                                header_cell.alignment = ExcelAlignment(horizontal="center", vertical="center")
+                                                start_row_churn += 2
+                                            else:
+                                                # Добавляем заголовок когорты
+                                                last_col_letter = get_column_letter(len(new_columns) + 1)
+                                                worksheet_churn.cell(row=start_row_churn + 1, column=1, value=f"Когорта: {selected_cohort}")
+                                                worksheet_churn.merge_cells(f'A{start_row_churn + 1}:{last_col_letter}{start_row_churn + 1}')
+                                                header_cell = worksheet_churn.cell(row=start_row_churn + 1, column=1)
+                                                header_cell.font = Font(bold=True, size=12)
+                                                header_cell.alignment = ExcelAlignment(horizontal="center", vertical="center")
+                                                start_row_churn += 2
+                                                
+                                                # Записываем таблицу на тот же лист
+                                                category_period_table_with_totals.to_excel(
+                                                    writer, 
+                                                    sheet_name="6. Присутствие клиентов оттока в других категориях", 
+                                                    startrow=start_row_churn, 
+                                                    index=True
+                                                )
+                                            
+                                            # Форматируем таблицу
+                                            for row_idx in range(start_row_churn + 2, start_row_churn + len(category_period_table_with_totals.index) + 2):
+                                                for col_idx in range(2, len(category_period_table_with_totals.columns) + 2):
+                                                    cell = worksheet_churn.cell(row=row_idx, column=col_idx)
+                                                    cell.alignment = ExcelAlignment(horizontal="center", vertical="center")
+                                                    if cell.value is not None and not isinstance(cell.value, str):
+                                                        cell.number_format = '0'
+                                            
+                                            # Форматируем заголовок строки
+                                            for row_idx in range(start_row_churn + 2, start_row_churn + len(category_period_table_with_totals.index) + 2):
+                                                cell = worksheet_churn.cell(row=row_idx, column=1)
+                                                cell.alignment = ExcelAlignment(horizontal="left", vertical="center")
+                                            
+                                            # Обновляем начальную строку для следующей таблицы (таблица + 2 пустые строки)
+                                            start_row_churn = start_row_churn + len(category_period_table_with_totals.index) + 3
                                 
                                 # Таблица 8: Сводная таблица по всем когортам
                                 if st.session_state.get('churn_table') is not None:
@@ -3209,6 +3275,109 @@ if uploaded_file is not None:
                                 # Сохраняем данные для Excel отчёта и сводной таблицы
                                 st.session_state.category_summary_table = summary_table_excel
                                 st.session_state.category_cohort_table = None
+                                
+                                # Предварительно создаем таблицы присутствия клиентов оттока для всех когорт
+                                # и сохраняем их в session_state для использования в Excel экспорте
+                                churn_presence_tables = {}
+                                period_clients_cache = st.session_state.get('period_clients_cache', None)
+                                period_indices = {period: idx for idx, period in enumerate(sorted_periods)}
+                                
+                                for cohort_period in sorted_periods:
+                                    # Получаем клиентов оттока для когорты
+                                    churn_clients_list = get_churn_clients(
+                                        df, year_month_col, client_col, sorted_periods, 
+                                        cohort_period, period_clients_cache, period_indices
+                                    )
+                                    churn_clients_set = {str(client) for client in churn_clients_list}
+                                    
+                                    # Определяем периоды начиная с этой когорты
+                                    cohort_index_cohort = period_indices.get(cohort_period, 0)
+                                    periods_from_cohort_cohort = sorted_periods[cohort_index_cohort:]
+                                    
+                                    # Создаем таблицу: категории по строкам, периоды по столбцам
+                                    category_period_table = pd.DataFrame(index=categories, columns=periods_from_cohort_cohort)
+                                    
+                                    # Словари для итогов
+                                    period_unique_clients = {period: set() for period in periods_from_cohort_cohort}
+                                    category_unique_clients = {category: set() for category in categories}
+                                    
+                                    # Заполняем таблицу
+                                    if year_month_col is not None:
+                                        for period in periods_from_cohort_cohort:
+                                            for category in categories:
+                                                if category in category_period_index and period in category_period_index[category]:
+                                                    category_period_clients = category_period_index[category][period]
+                                                else:
+                                                    category_period_clients = set()
+                                                
+                                                intersection = churn_clients_set & category_period_clients
+                                                category_period_table.loc[category, period] = len(intersection)
+                                                
+                                                period_unique_clients[period].update(intersection)
+                                                category_unique_clients[category].update(intersection)
+                                    else:
+                                        category_clients_dict = {}
+                                        for category in categories:
+                                            if category in category_period_index and 'all' in category_period_index[category]:
+                                                category_clients_dict[category] = category_period_index[category]['all']
+                                            else:
+                                                category_clients_dict[category] = set()
+                                        
+                                        for period in periods_from_cohort_cohort:
+                                            for category in categories:
+                                                category_clients_set = category_clients_dict.get(category, set())
+                                                intersection = churn_clients_set & category_clients_set
+                                                category_period_table.loc[category, period] = len(intersection)
+                                                
+                                                period_unique_clients[period].update(intersection)
+                                                category_unique_clients[category].update(intersection)
+                                    
+                                    # Заполняем NaN нулями
+                                    category_period_table = category_period_table.fillna(0).astype(int)
+                                    
+                                    # Создаем итоговую строку и столбец
+                                    totals_row = pd.Series(
+                                        {period: len(period_unique_clients[period]) for period in periods_from_cohort_cohort},
+                                        name='Итого клиентов'
+                                    )
+                                    
+                                    totals_col = pd.Series(
+                                        {category: len(category_unique_clients[category]) for category in categories},
+                                        name='Итого'
+                                    )
+                                    
+                                    # Добавляем итоги в таблицу
+                                    category_period_table_with_totals = category_period_table.copy()
+                                    category_period_table_with_totals.loc['Итого клиентов'] = totals_row
+                                    category_period_table_with_totals['Итого'] = totals_col
+                                    
+                                    # Вычисляем значение для ячейки пересечения
+                                    all_category_clients = set()
+                                    if year_month_col is not None:
+                                        for category in categories:
+                                            if category in category_period_index:
+                                                for period in periods_from_cohort_cohort:
+                                                    if period in category_period_index[category]:
+                                                        all_category_clients.update(category_period_index[category][period])
+                                    else:
+                                        for category in categories:
+                                            if category in category_period_index and 'all' in category_period_index[category]:
+                                                all_category_clients.update(category_period_index[category]['all'])
+                                    
+                                    present_in_categories = churn_clients_set & all_category_clients
+                                    category_period_table_with_totals.loc['Итого клиентов', 'Итого'] = len(present_in_categories)
+                                    
+                                    # Переупорядочиваем строки и столбцы
+                                    new_index = ['Итого клиентов'] + [cat for cat in categories]
+                                    category_period_table_with_totals = category_period_table_with_totals.reindex(new_index)
+                                    new_columns = ['Итого'] + list(periods_from_cohort_cohort)
+                                    category_period_table_with_totals = category_period_table_with_totals[new_columns]
+                                    
+                                    # Сохраняем таблицу для этой когорты
+                                    churn_presence_tables[cohort_period] = category_period_table_with_totals
+                                
+                                # Сохраняем все таблицы в session_state
+                                st.session_state.churn_presence_tables = churn_presence_tables
                                 
                                 # Обновляем Excel отчёт после сохранения всех данных
                                 if 'excel_report_cache_key' in st.session_state:
