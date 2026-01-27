@@ -2268,6 +2268,13 @@ if uploaded_file is not None:
                 
                 # Отображение матрицы (только если данные готовы)
                 if info:
+                    # Получаем данные из session state для использования в блоке
+                    df = st.session_state.df
+                    year_month_col = st.session_state.year_month_col
+                    client_col = st.session_state.client_col
+                    sorted_periods = st.session_state.sorted_periods
+                    cohort_matrix = st.session_state.cohort_matrix
+                    
                     # Уменьшаем отступ перед блоком матриц
                     st.markdown("<div style='margin-top: 5px;'></div>", unsafe_allow_html=True)
                     
