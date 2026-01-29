@@ -2818,48 +2818,26 @@ if uploaded_file is not None:
                                     st.info(f"❌ Нет данных")
                                 
                                 # Кнопка для скачивания всех когорт (всегда видна)
-                                # Используем данные из churn_table для получения правильного списка клиентов оттока
-                                # Важно: берем только клиентов оттока (тех, кто не вернулся после периода когорты)
-                                all_churn_clients = set()
-                                accumulation_matrix = st.session_state.get('accumulation_matrix', None)
-                                churn_table = st.session_state.get('churn_table', None)
+                                # Используем ТОЧНО ТУ ЖЕ логику, что и в кнопке выше для одной когорты
+                                # Просто собираем результаты для всех когорт точно так же, как работает кнопка выше
+                                all_churn_clients_list = []
                                 
-                                if churn_table is not None:
-                                    # Создаем словарь для быстрого доступа к данным таблицы оттока
-                                    churn_table_dict = churn_table.set_index('Когорта').to_dict('index')
-                                    
-                                    for cohort in sorted_periods:
-                                        # Получаем клиентов оттока для этой когорты (только тех, кто не вернулся)
-                                        cohort_churn = get_churn_clients(df, year_month_col, client_col, sorted_periods, cohort, period_clients_cache, accumulation_matrix=accumulation_matrix)
-                                        
-                                        # Проверяем, что количество клиентов оттока соответствует значению в таблице "Отток кол-во"
-                                        if cohort in churn_table_dict:
-                                            expected_churn_count = int(churn_table_dict[cohort]['Отток кол-во'])
-                                            # Преобразуем список в множество для добавления
-                                            cohort_churn_set = set(cohort_churn)
-                                            
-                                            # Если количество совпадает, добавляем всех клиентов оттока
-                                            if len(cohort_churn_set) == expected_churn_count:
-                                                all_churn_clients.update(cohort_churn_set)
-                                            # Если количество больше ожидаемого, это может быть ошибка, но все равно добавляем всех
-                                            elif len(cohort_churn_set) > expected_churn_count:
-                                                all_churn_clients.update(cohort_churn_set)
-                                            # Если количество меньше, но больше 0, все равно добавляем (может быть из-за округления)
-                                            elif expected_churn_count > 0:
-                                                all_churn_clients.update(cohort_churn_set)
-                                        else:
-                                            # Если когорты нет в таблице, все равно добавляем клиентов оттока
-                                            all_churn_clients.update(set(cohort_churn))
-                                else:
-                                    # Если таблицы нет, используем старую логику
-                                    for cohort in sorted_periods:
-                                        cohort_churn = get_churn_clients(df, year_month_col, client_col, sorted_periods, cohort, period_clients_cache, accumulation_matrix=accumulation_matrix)
-                                        all_churn_clients.update(set(cohort_churn))
+                                for cohort in sorted_periods:
+                                    # Используем ТОЧНО ТУ ЖЕ функцию с ТЕМИ ЖЕ параметрами, что и в работающей кнопке выше (строка 2804)
+                                    cohort_churn = get_churn_clients(df, year_month_col, client_col, sorted_periods, cohort, period_clients_cache, accumulation_matrix=accumulation_matrix)
+                                    # Добавляем всех клиентов оттока из этой когорты (cohort_churn уже отсортированный список)
+                                    if cohort_churn:
+                                        all_churn_clients_list.extend(cohort_churn)
                                 
-                                if all_churn_clients:
-                                    all_clients_csv = "\n".join([str(client) for client in sorted(all_churn_clients)])
+                                # Убираем дубликаты, используя множество (как в работающей кнопке используется список напрямую)
+                                all_churn_clients_set = set(all_churn_clients_list)
+                                
+                                if all_churn_clients_set:
+                                    # Преобразуем в отсортированный список для вывода (как в работающей кнопке)
+                                    all_churn_clients_sorted = sorted([str(client) for client in all_churn_clients_set])
+                                    all_clients_csv = "\n".join(all_churn_clients_sorted)
                                     st.download_button(
-                                        label=f"💾 Скачать коды клиентов оттока всех когорт ({len(all_churn_clients)})",
+                                        label=f"💾 Скачать коды клиентов оттока всех когорт ({len(all_churn_clients_set)})",
                                         data=all_clients_csv,
                                         file_name=f"отток_клиентов_все_когорты.txt",
                                         mime="text/plain",
