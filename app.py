@@ -1630,38 +1630,21 @@ if uploaded_file is not None:
                                         cohort = row['Когорта']
                                         summary_data['Отток из категории когорты %'][cohort] = row['Отток %']
                                     
-                                    # Инициализируем словари для метрик 6-11
-                                    summary_data['Кол-во клиентов когорты в других категориях'] = {}
-                                    summary_data['Кол-во клиентов когорты в других категориях %'] = {}
+                                    # Инициализируем словари для метрик 6-9
                                     summary_data['Кол-во клиентов когорты в других категориях после месяца когорты'] = {}
                                     summary_data['Кол-во клиентов когорты в других категориях после месяца когорты %'] = {}
                                     summary_data['Отток из сети'] = {}
                                     summary_data['Отток из сети %'] = {}
                                     
                                     for cohort in sorted_periods:
-                                        summary_data['Кол-во клиентов когорты в других категориях'][cohort] = 0
-                                        summary_data['Кол-во клиентов когорты в других категориях %'][cohort] = 0.0
                                         summary_data['Кол-во клиентов когорты в других категориях после месяца когорты'][cohort] = 0
                                         summary_data['Кол-во клиентов когорты в других категориях после месяца когорты %'][cohort] = 0.0
                                         summary_data['Отток из сети'][cohort] = 0
                                         summary_data['Отток из сети %'][cohort] = 0.0
                                     
-                                    # 6-11. Данные о присутствии в других категориях и оттоке из сети
+                                    # 6-9. Данные о присутствии в других категориях после месяца когорты и оттоке из сети
                                     if 'category_summary_table' in st.session_state and st.session_state.category_summary_table is not None:
                                         category_summary = st.session_state.category_summary_table
-                                        
-                                        if 'Итого присутствуют в других категориях' in category_summary.index:
-                                            for cohort in sorted_periods:
-                                                if cohort in category_summary.columns:
-                                                    value = category_summary.loc['Итого присутствуют в других категориях', cohort]
-                                                    summary_data['Кол-во клиентов когорты в других категориях'][cohort] = int(value) if pd.notna(value) else 0
-                                        
-                                        for cohort in sorted_periods:
-                                            cohort_size = summary_data['Кол-во клиентов в когорте'].get(cohort, 0)
-                                            present_count = summary_data['Кол-во клиентов когорты в других категориях'].get(cohort, 0)
-                                            if cohort_size > 0:
-                                                percent = (present_count / cohort_size) * 100
-                                                summary_data['Кол-во клиентов когорты в других категориях %'][cohort] = percent
                                         
                                         if 'Итого присутствуют в других категориях после месяца когорты' in category_summary.index:
                                             for cohort in sorted_periods:
@@ -2805,7 +2788,6 @@ if uploaded_file is not None:
                                 period_clients_cache = st.session_state.get('period_clients_cache', None)
                                 
                                 # Рассчитываем метрики для всех когорт для сводной таблицы
-                                total_present_by_cohort = {}
                                 total_present_after_cohort_by_cohort = {}
                                 total_present_after_cohort_percent_by_cohort = {}
                                 network_churn_by_cohort = {}
@@ -2825,31 +2807,22 @@ if uploaded_file is not None:
                                         all_category_clients_all_periods.update(category_clients)
                                 
                                 # Для каждой когорты рассчитываем метрики
+                                churn_table = st.session_state.churn_table
                                 for cohort_period in sorted_periods:
                                     # Получаем клиентов оттока для этой когорты
                                     churn_clients_set_cohort = set(get_churn_clients(df, year_month_col, client_col, sorted_periods, cohort_period, period_clients_cache))
                                     churn_clients_set_cohort = {str(client) for client in churn_clients_set_cohort}
+                                    
+                                    # Получаем отток из категории для этой когорты
+                                    cohort_row = churn_table[churn_table['Когорта'] == cohort_period]
+                                    churn_count_cohort = int(cohort_row.iloc[0]['Отток кол-во']) if not cohort_row.empty else 0
+                                    cohort_size_cohort = int(cohort_row.iloc[0]['Кол-во клиентов когорты']) if not cohort_row.empty else 0
                                     
                                     # Определяем периоды начиная с этой когорты
                                     cohort_index_cohort = sorted_periods.index(cohort_period) if cohort_period in sorted_periods else 0
                                     periods_from_cohort_cohort = sorted_periods[cohort_index_cohort:]
                                     # Периоды ПОСЛЕ когорты (исключая период когорты)
                                     periods_after_cohort_cohort = periods_from_cohort_cohort[1:] if len(periods_from_cohort_cohort) > 1 else []
-                                    
-                                    # Собираем клиентов из категорий только для периодов >= когорты
-                                    all_category_clients_from_cohort = set()
-                                    if year_month_col is not None:
-                                        for category in categories:
-                                            category_data = df_categories[df_categories[group_col] == category]
-                                            category_data_filtered = category_data[category_data[year_month_col].isin(periods_from_cohort_cohort)]
-                                            category_clients = set(category_data_filtered[client_code_col].dropna().astype(str).unique())
-                                            all_category_clients_from_cohort.update(category_clients)
-                                    else:
-                                        all_category_clients_from_cohort = all_category_clients_all_periods
-                                    
-                                    # Клиенты оттока, присутствующие в других категориях (начиная с периода когорты)
-                                    present_in_categories_cohort = churn_clients_set_cohort & all_category_clients_from_cohort
-                                    total_present_by_cohort[cohort_period] = len(present_in_categories_cohort)
                                     
                                     # Клиенты оттока, присутствующие в других категориях ПОСЛЕ месяца когорты
                                     all_category_clients_after_cohort = set()
@@ -2866,25 +2839,21 @@ if uploaded_file is not None:
                                     total_present_after_cohort_by_cohort[cohort_period] = len(present_in_categories_after_cohort)
                                     
                                     # % присутствия после месяца когорты
-                                    churn_table = st.session_state.churn_table
-                                    cohort_row = churn_table[churn_table['Когорта'] == cohort_period]
-                                    cohort_size_cohort = int(cohort_row.iloc[0]['Кол-во клиентов когорты']) if not cohort_row.empty else 0
                                     present_after_cohort_percent = (len(present_in_categories_after_cohort) / cohort_size_cohort * 100) if cohort_size_cohort > 0 else 0
                                     total_present_after_cohort_percent_by_cohort[cohort_period] = present_after_cohort_percent
                                     
-                                    # Отток из сети = клиенты оттока, которые не появились ни в одной категории после периода когорты
-                                    network_churn_cohort = len(churn_clients_set_cohort - all_category_clients_from_cohort)
-                                    network_churn_by_cohort[cohort_period] = network_churn_cohort
+                                    # Отток из сети = Отток из категории - Клиентов когорты присутствуют в других категориях после месяца когорты
+                                    network_churn_cohort = churn_count_cohort - len(present_in_categories_after_cohort)
+                                    network_churn_by_cohort[cohort_period] = max(0, network_churn_cohort)  # Не может быть отрицательным
                                     
                                     # % оттока из сети
-                                    network_churn_percent_cohort = (network_churn_cohort / cohort_size_cohort * 100) if cohort_size_cohort > 0 else 0
+                                    network_churn_percent_cohort = (network_churn_by_cohort[cohort_period] / cohort_size_cohort * 100) if cohort_size_cohort > 0 else 0
                                     network_churn_percent_by_cohort[cohort_period] = network_churn_percent_cohort
                                 
                                 # Создаем таблицу для сохранения в session_state
                                 summary_table_excel = pd.DataFrame({
                                     'Отток из сети': network_churn_by_cohort,
                                     'Доля оттока из сети от когорты': network_churn_percent_by_cohort,
-                                    'Итого присутствуют в других категориях': total_present_by_cohort,
                                     'Итого присутствуют в других категориях после месяца когорты': total_present_after_cohort_by_cohort,
                                     'Доля присутствуют в других категориях после месяца когорты': total_present_after_cohort_percent_by_cohort
                                 })
@@ -2924,6 +2893,9 @@ if uploaded_file is not None:
                                     # Определяем периоды начиная с выбранной когорты
                                     cohort_index = sorted_periods.index(selected_cohort) if selected_cohort in sorted_periods else 0
                                     periods_from_cohort = sorted_periods[cohort_index:]
+                                    # Периоды ПОСЛЕ когорты (исключая период когорты) - начинаем расчет с этого периода
+                                    periods_after_cohort = periods_from_cohort[1:] if len(periods_from_cohort) > 1 else []
+                                    
                                     # Получаем клиентов оттока для выбранной когорты
                                     churn_clients_set = set(get_churn_clients(df, year_month_col, client_col, sorted_periods, selected_cohort, period_clients_cache))
                                     churn_clients_set = {str(client) for client in churn_clients_set}
@@ -2934,31 +2906,7 @@ if uploaded_file is not None:
                                     cohort_size = int(cohort_row.iloc[0]['Кол-во клиентов когорты']) if not cohort_row.empty else 0
                                     churn_count = int(cohort_row.iloc[0]['Отток кол-во']) if not cohort_row.empty else 0
                                     
-                                    # Собираем всех уникальных клиентов оттока, которые присутствуют хотя бы в одной категории
-                                    # ТОЛЬКО в периодах начиная с выбранной когорты
-                                    all_category_clients = set()
-                                    if year_month_col is not None:
-                                        # Используем только данные из периодов >= выбранной когорты
-                                        for category in categories:
-                                            category_data = df_categories[df_categories[group_col] == category]
-                                            # Фильтруем только периоды >= выбранной когорты
-                                            category_data_filtered = category_data[category_data[year_month_col].isin(periods_from_cohort)]
-                                            category_clients = set(category_data_filtered[client_code_col].dropna().astype(str).unique())
-                                            all_category_clients.update(category_clients)
-                                    else:
-                                        # Если нет столбца "Год-месяц", используем все данные
-                                        for category in categories:
-                                            category_data = df_categories[df_categories[group_col] == category]
-                                            category_clients = set(category_data[client_code_col].dropna().astype(str).unique())
-                                            all_category_clients.update(category_clients)
-                                    
-                                    # Клиенты оттока, присутствующие в других категориях (начиная с периода когорты)
-                                    present_in_categories = churn_clients_set & all_category_clients
-                                    present_count = len(present_in_categories)
-                                    present_percent = (present_count / cohort_size * 100) if cohort_size > 0 else 0
-                                    
-                                    # Клиенты оттока, присутствующие в других категориях ПОСЛЕ месяца когорты (исключая период когорты)
-                                    periods_after_cohort = periods_from_cohort[1:] if len(periods_from_cohort) > 1 else []
+                                    # Клиенты оттока, присутствующие в других категориях ПОСЛЕ месяца когорты
                                     all_category_clients_after_cohort = set()
                                     if year_month_col is not None and len(periods_after_cohort) > 0:
                                         # Используем только данные из периодов ПОСЛЕ выбранной когорты
@@ -2969,28 +2917,29 @@ if uploaded_file is not None:
                                             category_clients = set(category_data_filtered[client_code_col].dropna().astype(str).unique())
                                             all_category_clients_after_cohort.update(category_clients)
                                     elif year_month_col is None:
-                                        # Если нет столбца "Год-месяц", используем все данные (но это не совсем правильно)
-                                        all_category_clients_after_cohort = all_category_clients
+                                        # Если нет столбца "Год-месяц", собираем всех клиентов из всех категорий
+                                        for category in categories:
+                                            category_data = df_categories[df_categories[group_col] == category]
+                                            category_clients = set(category_data[client_code_col].dropna().astype(str).unique())
+                                            all_category_clients_after_cohort.update(category_clients)
                                     
                                     present_in_categories_after_cohort = churn_clients_set & all_category_clients_after_cohort
                                     present_count_after_cohort = len(present_in_categories_after_cohort)
                                     present_percent_after_cohort = (present_count_after_cohort / cohort_size * 100) if cohort_size > 0 else 0
                                     
-                                    # Отток из сети = клиенты оттока, которые не появились ни в одной категории после периода когорты
-                                    network_churn = len(churn_clients_set - all_category_clients)
+                                    # Отток из сети = Отток из категории - Клиентов когорты присутствуют в других категориях после месяца когорты
+                                    network_churn = churn_count - present_count_after_cohort
+                                    network_churn = max(0, network_churn)  # Не может быть отрицательным
                                     network_churn_percent = (network_churn / cohort_size * 100) if cohort_size > 0 else 0
                                     
-                                    # Вычисляем клиентов оттока из сети (тех, кто не присутствует ни в одной категории)
-                                    network_churn_clients = churn_clients_set - all_category_clients
+                                    # Вычисляем клиентов оттока из сети
+                                    # Это клиенты оттока, которые НЕ присутствуют в других категориях после месяца когорты
+                                    network_churn_clients = churn_clients_set - all_category_clients_after_cohort
                                     network_churn_clients_list = sorted(list(network_churn_clients))
                                     
                                     # Выводим метрики в текстовом формате с цветом (проценты в скобках)
                                     metrics_html = f"""
                                     <div style="line-height: 2;">
-                                    <p style="color: #333; font-size: 1rem; margin: 8px 0;">
-                                        <strong style="color: #1f77b4;">Клиентов когорты присутствуют в других категориях:</strong> 
-                                        <span style="color: #2c3e50; font-weight: 600;">{present_count} ({present_percent:.1f}%)</span>
-                                    </p>
                                     <p style="color: #333; font-size: 1rem; margin: 8px 0;">
                                         <strong style="color: #1f77b4;">Клиентов когорты присутствуют в других категориях после месяца когорты:</strong> 
                                         <span style="color: #2c3e50; font-weight: 600;">{present_count_after_cohort} ({present_percent_after_cohort:.1f}%)</span>
@@ -3018,23 +2967,25 @@ if uploaded_file is not None:
                                         st.info("ℹ️ Отток из сети равен 0 или все клиенты оттока присутствуют в других категориях")
                                 
                                 with col_table:
-                                    # Определяем периоды начиная с выбранной когорты (для использования в таблице)
+                                    # Определяем периоды ПОСЛЕ выбранной когорты (для использования в таблице)
                                     cohort_index_table = sorted_periods.index(selected_cohort) if selected_cohort in sorted_periods else 0
-                                    periods_from_cohort = sorted_periods[cohort_index_table:]
+                                    periods_from_cohort_table = sorted_periods[cohort_index_table:]
+                                    # Периоды ПОСЛЕ когорты (исключая период когорты) - начинаем расчет с этого периода
+                                    periods_after_cohort_table = periods_from_cohort_table[1:] if len(periods_from_cohort_table) > 1 else []
                                     
-                                    # Создаем таблицу: категории по строкам, периоды по столбцам (только начиная с выбранной когорты)
-                                    category_period_table = pd.DataFrame(index=categories, columns=periods_from_cohort)
+                                    # Создаем таблицу: категории по строкам, периоды по столбцам (только ПОСЛЕ выбранной когорты)
+                                    category_period_table = pd.DataFrame(index=categories, columns=periods_after_cohort_table)
                                     
                                     # Словарь для хранения уникальных клиентов по периодам (для итоговой строки)
-                                    period_unique_clients = {period: set() for period in periods_from_cohort}
+                                    period_unique_clients = {period: set() for period in periods_after_cohort_table}
                                     
                                     # Словарь для хранения уникальных клиентов по категориям (для итогового столбца)
                                     category_unique_clients = {category: set() for category in categories}
                                     
                                     # Если есть столбец "Год-месяц", используем его для фильтрации по периодам
                                     if year_month_col is not None:
-                                        # Для каждого периода начиная с выбранной когорты проверяем присутствие клиентов оттока в категориях
-                                        for period in periods_from_cohort:
+                                        # Для каждого периода ПОСЛЕ выбранной когорты проверяем присутствие клиентов оттока в категориях
+                                        for period in periods_after_cohort_table:
                                             # Фильтруем данные по периоду
                                             period_data = df_categories[df_categories[year_month_col] == period]
                                             
@@ -3067,8 +3018,8 @@ if uploaded_file is not None:
                                             client_codes = set(category_data[client_code_col].dropna().astype(str).unique())
                                             category_clients_dict[category] = client_codes
                                         
-                                        # Для каждого периода начиная с выбранной когорты используем одинаковые данные
-                                        for period in periods_from_cohort:
+                                        # Для каждого периода ПОСЛЕ выбранной когорты используем одинаковые данные
+                                        for period in periods_after_cohort_table:
                                             for category in categories:
                                                 category_clients_set = category_clients_dict.get(category, set())
                                                 intersection = churn_clients_set & category_clients_set
@@ -3083,7 +3034,7 @@ if uploaded_file is not None:
                                     
                                     # Создаем итоговую строку по периодам (уникальные клиенты по всем категориям)
                                     totals_row = pd.Series(
-                                        {period: len(period_unique_clients[period]) for period in periods_from_cohort},
+                                        {period: len(period_unique_clients[period]) for period in periods_after_cohort_table},
                                         name='Итого клиентов'
                                     )
                                     
@@ -3099,14 +3050,14 @@ if uploaded_file is not None:
                                     
                                     # Добавляем итоговый столбец
                                     category_period_table_with_totals['Итого'] = totals_col
-                                    category_period_table_with_totals.loc['Итого клиентов', 'Итого'] = len(present_in_categories)
+                                    category_period_table_with_totals.loc['Итого клиентов', 'Итого'] = len(present_in_categories_after_cohort)
                                     
                                     # Переупорядочиваем строки: итоговая строка наверх
                                     new_index = ['Итого клиентов'] + [cat for cat in categories]
                                     category_period_table_with_totals = category_period_table_with_totals.reindex(new_index)
                                     
                                     # Переупорядочиваем столбцы: итоговый столбец слева (после индекса, перед периодами)
-                                    new_columns = ['Итого'] + list(periods_from_cohort)
+                                    new_columns = ['Итого'] + list(periods_after_cohort_table)
                                     category_period_table_with_totals = category_period_table_with_totals[new_columns]
                                     
                                     # Отображаем основную таблицу с итогами
@@ -3255,49 +3206,23 @@ if uploaded_file is not None:
                             cohort = row['Когорта']
                             summary_data['Отток из категории когорты %'][cohort] = f"{row['Отток %']:.1f}%"
                         
-                        # Инициализируем словари для метрик 6-11 заранее (заполняем нулями по умолчанию)
-                        summary_data['Кол-во клиентов когорты в других категориях'] = {}
-                        summary_data['Кол-во клиентов когорты в других категориях %'] = {}
+                        # Инициализируем словари для метрик 6-9 заранее (заполняем нулями по умолчанию)
                         summary_data['Кол-во клиентов когорты в других категориях после месяца когорты'] = {}
                         summary_data['Кол-во клиентов когорты в других категориях после месяца когорты %'] = {}
                         summary_data['Отток из сети'] = {}
                         summary_data['Отток из сети %'] = {}
                         
                         for cohort in sorted_periods:
-                            summary_data['Кол-во клиентов когорты в других категориях'][cohort] = 0
-                            summary_data['Кол-во клиентов когорты в других категориях %'][cohort] = "0.0%"
                             summary_data['Кол-во клиентов когорты в других категориях после месяца когорты'][cohort] = 0
                             summary_data['Кол-во клиентов когорты в других категориях после месяца когорты %'][cohort] = "0.0%"
                             summary_data['Отток из сети'][cohort] = 0
                             summary_data['Отток из сети %'][cohort] = "0.0%"
                         
-                        # 6-11. Данные о присутствии в других категориях и оттоке из сети (если есть данные)
+                        # 6-9. Данные о присутствии в других категориях после месяца когорты и оттоке из сети (если есть данные)
                         if 'category_summary_table' in st.session_state and st.session_state.category_summary_table is not None:
                             category_summary = st.session_state.category_summary_table
                             
-                            # 6. Кол-во клиентов когорты в других категориях (обновляем значения)
-                            if 'Итого присутствуют в других категориях' in category_summary.index:
-                                for cohort in sorted_periods:
-                                    if cohort in category_summary.columns:
-                                        value = category_summary.loc['Итого присутствуют в других категориях', cohort]
-                                        summary_data['Кол-во клиентов когорты в других категориях'][cohort] = int(value) if pd.notna(value) else 0
-                                    else:
-                                        summary_data['Кол-во клиентов когорты в других категориях'][cohort] = 0
-                            else:
-                                for cohort in sorted_periods:
-                                    summary_data['Кол-во клиентов когорты в других категориях'][cohort] = 0
-                            
-                            # 7. Кол-во клиентов когорты в других категориях % (обновляем значения)
-                            for cohort in sorted_periods:
-                                cohort_size = summary_data['Кол-во клиентов в когорте'].get(cohort, 0)
-                                present_count = summary_data['Кол-во клиентов когорты в других категориях'].get(cohort, 0)
-                                if cohort_size > 0:
-                                    percent = (present_count / cohort_size) * 100
-                                    summary_data['Кол-во клиентов когорты в других категориях %'][cohort] = f"{percent:.1f}%"
-                                else:
-                                    summary_data['Кол-во клиентов когорты в других категориях %'][cohort] = "0.0%"
-                            
-                            # 8. Кол-во клиентов когорты в других категориях после месяца когорты (обновляем значения)
+                            # 6. Кол-во клиентов когорты в других категориях после месяца когорты (обновляем значения)
                             if 'Итого присутствуют в других категориях после месяца когорты' in category_summary.index:
                                 for cohort in sorted_periods:
                                     if cohort in category_summary.columns:
@@ -3306,7 +3231,7 @@ if uploaded_file is not None:
                                     else:
                                         summary_data['Кол-во клиентов когорты в других категориях после месяца когорты'][cohort] = 0
                             
-                            # 9. Кол-во клиентов когорты в других категориях после месяца когорты % (обновляем значения)
+                            # 7. Кол-во клиентов когорты в других категориях после месяца когорты % (обновляем значения)
                             if 'Доля присутствуют в других категориях после месяца когорты' in category_summary.index:
                                 for cohort in sorted_periods:
                                     if cohort in category_summary.columns:
@@ -3328,7 +3253,7 @@ if uploaded_file is not None:
                                     else:
                                         summary_data['Кол-во клиентов когорты в других категориях после месяца когорты %'][cohort] = "0.0%"
                             
-                            # 10. Отток из сети (обновляем значения)
+                            # 8. Отток из сети (обновляем значения)
                             if 'Отток из сети' in category_summary.index:
                                 for cohort in sorted_periods:
                                     if cohort in category_summary.columns:
@@ -3340,7 +3265,7 @@ if uploaded_file is not None:
                                 for cohort in sorted_periods:
                                     summary_data['Отток из сети'][cohort] = 0
                             
-                            # 11. Отток из сети % (обновляем значения)
+                            # 9. Отток из сети % (обновляем значения)
                             if 'Доля оттока из сети от когорты' in category_summary.index:
                                 for cohort in sorted_periods:
                                     if cohort in category_summary.columns:
