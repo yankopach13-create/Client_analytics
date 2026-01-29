@@ -2828,25 +2828,14 @@ if uploaded_file is not None:
                                     if cohort_churn:
                                         all_churn_clients_list.extend(cohort_churn)
                                 
-                                # Подсчитываем, сколько раз каждый клиент встречается во ВСЁМ датасете (во всех периодах)
-                                # Считаем количество уникальных периодов для каждого клиента во всём датасете
-                                client_period_counts = df.groupby(client_col)[year_month_col].nunique().to_dict()
-                                
-                                # Берем только тех клиентов из списка оттока, которые встречаются только 1 раз во всём датасете (только в одном периоде)
-                                clients_appearing_once = [
-                                    client for client in all_churn_clients_list 
-                                    if client_period_counts.get(client, 0) == 1
-                                ]
-                                
-                                # Убираем дубликаты (на случай, если клиент попал в список оттока несколько раз)
-                                clients_appearing_once_unique = list(set(clients_appearing_once))
-                                
-                                if clients_appearing_once_unique:
+                                # НЕ фильтруем и НЕ удаляем дубликаты - просто собираем всех клиентов оттока из всех когорт
+                                # Это соответствует сумме по столбцу "Отток кол-во" (если клиент отток из нескольких когорт, он будет несколько раз)
+                                if all_churn_clients_list:
                                     # Преобразуем в отсортированный список для вывода
-                                    all_churn_clients_sorted = sorted([str(client) for client in clients_appearing_once_unique])
+                                    all_churn_clients_sorted = sorted([str(client) for client in all_churn_clients_list])
                                     all_clients_csv = "\n".join(all_churn_clients_sorted)
                                     st.download_button(
-                                        label=f"💾 Скачать коды клиентов оттока всех когорт ({len(clients_appearing_once_unique)})",
+                                        label=f"💾 Скачать коды клиентов оттока всех когорт ({len(all_churn_clients_list)})",
                                         data=all_clients_csv,
                                         file_name=f"отток_клиентов_все_когорты.txt",
                                         mime="text/plain",
