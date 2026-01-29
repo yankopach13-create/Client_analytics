@@ -126,8 +126,8 @@ def parse_period(period_str):
             if 1 <= week <= 53:
                 return (year, week, 1)  # 1 = неделя
         
-        # Пытаемся распарсить как неделю в формате "2024-неделя01", "2024-неделя1", "2024-неделя-01"
-        match_week_word = re.match(r'(\d{4})[-_]?неделя[-_]?(\d{1,2})', period_str.lower())
+        # Пытаемся распарсить как неделю в формате "2024-неделя01", "2024-неделя1"
+        match_week_word = re.match(r'(\d{4})[-_]?неделя(\d{1,2})', period_str.lower())
         if match_week_word:
             year = int(match_week_word.group(1))
             week = int(match_week_word.group(2))
@@ -846,7 +846,7 @@ def get_accumulation_clients(df, year_month_col, client_col, sorted_periods, coh
     
     return sorted(list(returned_clients))
 
-def get_churn_clients(df, year_month_col, client_col, sorted_periods, cohort_period, period_clients_cache=None, period_indices=None, accumulation_matrix=None):
+def get_churn_clients(df, year_month_col, client_col, sorted_periods, cohort_period, period_clients_cache=None, period_indices=None):
     """Получает коды клиентов оттока из когорты (те, кто не вернулся ни разу после периода когорты)"""
     # Оптимизация: используем переданный period_indices или создаем один раз
     if period_indices is None:
@@ -862,29 +862,14 @@ def get_churn_clients(df, year_month_col, client_col, sorted_periods, cohort_per
     else:
         cohort_clients = set(df[df[year_month_col] == cohort_period][client_col].dropna().unique())
     
-    # Если это последняя когорта (нет периодов после неё), то все клиенты считаются оттоком
-    if cohort_idx == len(sorted_periods) - 1:
-        return sorted(list(cohort_clients))
-    
     # Находим всех клиентов когорты, которые вернулись хотя бы раз в любом периоде после когорты
     returned_clients = set()
-    periods_after_cohort = sorted_periods[cohort_idx + 1:]
-    
-    if not periods_after_cohort:
-        # Если нет периодов после когорты, все клиенты - отток
-        return sorted(list(cohort_clients))
-    
-    # Используем более эффективный подход: собираем всех клиентов из всех периодов после когорты
-    all_periods_clients = set()
-    for period in periods_after_cohort:
+    for period in sorted_periods[cohort_idx + 1:]:
         if period_clients_cache:
             period_clients = period_clients_cache.get(period, set())
         else:
             period_clients = set(df[df[year_month_col] == period][client_col].dropna().unique())
-        all_periods_clients.update(period_clients)
-    
-    # Находим пересечение: клиенты когорты, которые есть хотя бы в одном периоде после когорты
-    returned_clients = cohort_clients & all_periods_clients
+        returned_clients.update(cohort_clients & period_clients)
     
     # Отток = клиенты когорты - вернувшиеся клиенты
     churn_clients = cohort_clients - returned_clients
@@ -1220,11 +1205,10 @@ if uploaded_file is not None:
         year_month_col = None
         client_col = None
         
-        # Ищем столбец с периодом (год-месяц, год-неделя или неделя)
+        # Ищем столбец с периодом (год-месяц или год-неделя)
         for col in df.columns:
             col_lower = str(col).lower()
-            if ('год' in col_lower and ('месяц' in col_lower or 'неделя' in col_lower)) or \
-               (col_lower == 'неделя' or col_lower.startswith('неделя')):
+            if 'год' in col_lower and ('месяц' in col_lower or 'неделя' in col_lower or 'неделя' in col_lower):
                 year_month_col = col
                 break
         
@@ -1435,7 +1419,7 @@ if uploaded_file is not None:
                                                 cell.value = float(cell.value) / 100.0
                                                 cell.number_format = '0.0%'  # Процентный формат Excel
                                 
-                                # Таблица 6: Присутствие клиентов оттока когорты в других категориях товаров
+                                # Таблица 7: Присутствие клиентов оттока когорты в других категориях товаров
                                 if 'df_categories' in st.session_state and st.session_state.df_categories is not None and \
                                    'categories_list' in st.session_state and st.session_state.categories_list is not None and \
                                    'group_col_name' in st.session_state and st.session_state.group_col_name is not None and \
@@ -1454,8 +1438,8 @@ if uploaded_file is not None:
                                     if 'category_summary_table' in st.session_state and st.session_state.category_summary_table is not None:
                                         summary_table_excel = st.session_state.category_summary_table.copy()
                                         summary_table_excel.index.name = 'Метрика / Когорта'
-                                        summary_table_excel.to_excel(writer, sheet_name="6. Присутствие клиентов оттока в других категориях", startrow=start_row_cohorts, index=True)
-                                        worksheet_cohorts = writer.sheets["6. Присутствие клиентов оттока в других категориях"]
+                                        summary_table_excel.to_excel(writer, sheet_name="7. Присутствие когорты в других категориях", startrow=start_row_cohorts, index=True)
+                                        worksheet_cohorts = writer.sheets["7. Присутствие когорты в других категориях"]
                                         
                                         # Форматируем верхнюю таблицу
                                         for row_idx in range(start_row_cohorts + 2, start_row_cohorts + len(summary_table_excel.index) + 2):
@@ -1483,10 +1467,10 @@ if uploaded_file is not None:
                                         category_table_excel.index.name = 'Категория / Когорта'
                                         
                                         if worksheet_cohorts is None:
-                                            category_table_excel.to_excel(writer, sheet_name="6. Присутствие клиентов оттока в других категориях", startrow=start_row_cohorts, index=True)
-                                            worksheet_cohorts = writer.sheets["6. Присутствие клиентов оттока в других категориях"]
+                                            category_table_excel.to_excel(writer, sheet_name="7. Присутствие когорты в других категориях", startrow=start_row_cohorts, index=True)
+                                            worksheet_cohorts = writer.sheets["7. Присутствие когорты в других категориях"]
                                         else:
-                                            category_table_excel.to_excel(writer, sheet_name="6. Присутствие клиентов оттока в других категориях", startrow=start_row_cohorts, index=True)
+                                            category_table_excel.to_excel(writer, sheet_name="7. Присутствие когорты в других категориях", startrow=start_row_cohorts, index=True)
                                         
                                         # Форматируем таблицу с категориями
                                         for row_idx in range(start_row_cohorts + 2, start_row_cohorts + len(category_table_excel.index) + 2):
@@ -1614,11 +1598,11 @@ if uploaded_file is not None:
                                             # Создаем новый лист
                                             category_period_table_with_totals.to_excel(
                                                 writer, 
-                                                sheet_name="6. Присутствие клиентов оттока в других категориях", 
+                                                sheet_name="7. Присутствие когорты в других категориях", 
                                                 startrow=start_row_cohorts, 
                                                 index=True
                                             )
-                                            worksheet_cohorts = writer.sheets["6. Присутствие клиентов оттока в других категориях"]
+                                            worksheet_cohorts = writer.sheets["7. Присутствие когорты в других категориях"]
                                             # Добавляем заголовок когорты
                                             last_col_letter = get_column_letter(len(new_columns) + 1)
                                             worksheet_cohorts.cell(row=start_row_cohorts + 1, column=1, value=f"Когорта: {selected_cohort}")
@@ -1640,7 +1624,7 @@ if uploaded_file is not None:
                                             # Записываем таблицу на тот же лист
                                             category_period_table_with_totals.to_excel(
                                                 writer, 
-                                                sheet_name="6. Присутствие клиентов оттока в других категориях", 
+                                                sheet_name="7. Присутствие когорты в других категориях", 
                                                 startrow=start_row_cohorts, 
                                                 index=True
                                             )
@@ -1661,7 +1645,7 @@ if uploaded_file is not None:
                                         # Обновляем начальную строку для следующей таблицы (таблица + 2 пустые строки)
                                         start_row_cohorts = start_row_cohorts + len(category_period_table_with_totals.index) + 3
                                 
-                                # Таблица 7: Сводная таблица по всем когортам
+                                # Таблица 8: Сводная таблица по всем когортам
                                 if st.session_state.get('churn_table') is not None:
                                     churn_table = st.session_state.churn_table
                                     
@@ -1721,129 +1705,60 @@ if uploaded_file is not None:
                                     if 'category_summary_table' in st.session_state and st.session_state.category_summary_table is not None:
                                         category_summary = st.session_state.category_summary_table
                                         
-                                        # 6. Кол-во клиентов когорты в других категориях
                                         if 'Итого присутствуют в других категориях' in category_summary.index:
                                             for cohort in sorted_periods:
                                                 if cohort in category_summary.columns:
-                                                    try:
-                                                        value = category_summary.loc['Итого присутствуют в других категориях', cohort]
-                                                        summary_data['Кол-во клиентов когорты в других категориях'][cohort] = int(value) if pd.notna(value) and value != '' else 0
-                                                    except (KeyError, IndexError):
-                                                        summary_data['Кол-во клиентов когорты в других категориях'][cohort] = 0
+                                                    value = category_summary.loc['Итого присутствуют в других категориях', cohort]
+                                                    summary_data['Кол-во клиентов когорты в других категориях'][cohort] = int(value) if pd.notna(value) else 0
                                         
-                                        # 7. Кол-во клиентов когорты в других категориях %
                                         for cohort in sorted_periods:
                                             cohort_size = summary_data['Кол-во клиентов в когорте'].get(cohort, 0)
                                             present_count = summary_data['Кол-во клиентов когорты в других категориях'].get(cohort, 0)
                                             if cohort_size > 0:
                                                 percent = (present_count / cohort_size) * 100
                                                 summary_data['Кол-во клиентов когорты в других категориях %'][cohort] = percent
-                                            else:
-                                                summary_data['Кол-во клиентов когорты в других категориях %'][cohort] = 0.0
                                         
-                                        # 8. Кол-во клиентов когорты в других категориях после месяца когорты
                                         if 'Итого присутствуют в других категориях после месяца когорты' in category_summary.index:
                                             for cohort in sorted_periods:
                                                 if cohort in category_summary.columns:
-                                                    try:
-                                                        value = category_summary.loc['Итого присутствуют в других категориях после месяца когорты', cohort]
-                                                        summary_data['Кол-во клиентов когорты в других категориях после месяца когорты'][cohort] = int(value) if pd.notna(value) and value != '' else 0
-                                                    except (KeyError, IndexError):
-                                                        summary_data['Кол-во клиентов когорты в других категориях после месяца когорты'][cohort] = 0
+                                                    value = category_summary.loc['Итого присутствуют в других категориях после месяца когорты', cohort]
+                                                    summary_data['Кол-во клиентов когорты в других категориях после месяца когорты'][cohort] = int(value) if pd.notna(value) else 0
                                         
-                                        # 9. Кол-во клиентов когорты в других категориях после месяца когорты %
                                         if 'Доля присутствуют в других категориях после месяца когорты' in category_summary.index:
                                             for cohort in sorted_periods:
                                                 if cohort in category_summary.columns:
-                                                    try:
-                                                        value = category_summary.loc['Доля присутствуют в других категориях после месяца когорты', cohort]
-                                                        if pd.notna(value) and value != '':
-                                                            # Если значение уже в процентах (например, 45.7), используем его
-                                                            summary_data['Кол-во клиентов когорты в других категориях после месяца когорты %'][cohort] = float(value)
-                                                        else:
-                                                            # Вычисляем процент вручную
-                                                            cohort_size = summary_data['Кол-во клиентов в когорте'].get(cohort, 0)
-                                                            present_after_count = summary_data['Кол-во клиентов когорты в других категориях после месяца когорты'].get(cohort, 0)
-                                                            if cohort_size > 0:
-                                                                percent = (present_after_count / cohort_size) * 100
-                                                                summary_data['Кол-во клиентов когорты в других категориях после месяца когорты %'][cohort] = percent
-                                                            else:
-                                                                summary_data['Кол-во клиентов когорты в других категориях после месяца когорты %'][cohort] = 0.0
-                                                    except (KeyError, IndexError, ValueError):
-                                                        # Вычисляем процент вручную при ошибке
-                                                        cohort_size = summary_data['Кол-во клиентов в когорте'].get(cohort, 0)
-                                                        present_after_count = summary_data['Кол-во клиентов когорты в других категориях после месяца когорты'].get(cohort, 0)
-                                                        if cohort_size > 0:
-                                                            percent = (present_after_count / cohort_size) * 100
-                                                            summary_data['Кол-во клиентов когорты в других категориях после месяца когорты %'][cohort] = percent
-                                                        else:
-                                                            summary_data['Кол-во клиентов когорты в других категориях после месяца когорты %'][cohort] = 0.0
+                                                    value = category_summary.loc['Доля присутствуют в других категориях после месяца когорты', cohort]
+                                                    if pd.notna(value):
+                                                        summary_data['Кол-во клиентов когорты в других категориях после месяца когорты %'][cohort] = value
                                         else:
-                                            # Вычисляем процент вручную, если строка отсутствует
+                                            # Вычисляем процент вручную
                                             for cohort in sorted_periods:
                                                 cohort_size = summary_data['Кол-во клиентов в когорте'].get(cohort, 0)
                                                 present_after_count = summary_data['Кол-во клиентов когорты в других категориях после месяца когорты'].get(cohort, 0)
                                                 if cohort_size > 0:
                                                     percent = (present_after_count / cohort_size) * 100
                                                     summary_data['Кол-во клиентов когорты в других категориях после месяца когорты %'][cohort] = percent
-                                                else:
-                                                    summary_data['Кол-во клиентов когорты в других категориях после месяца когорты %'][cohort] = 0.0
                                         
-                                        # 10. Отток из сети
                                         if 'Отток из сети' in category_summary.index:
                                             for cohort in sorted_periods:
                                                 if cohort in category_summary.columns:
-                                                    try:
-                                                        value = category_summary.loc['Отток из сети', cohort]
-                                                        summary_data['Отток из сети'][cohort] = int(value) if pd.notna(value) and value != '' else 0
-                                                    except (KeyError, IndexError):
-                                                        summary_data['Отток из сети'][cohort] = 0
+                                                    value = category_summary.loc['Отток из сети', cohort]
+                                                    summary_data['Отток из сети'][cohort] = int(value) if pd.notna(value) else 0
                                         
-                                        # 11. Отток из сети %
                                         if 'Доля оттока из сети от когорты' in category_summary.index:
                                             for cohort in sorted_periods:
                                                 if cohort in category_summary.columns:
-                                                    try:
-                                                        value = category_summary.loc['Доля оттока из сети от когорты', cohort]
-                                                        if pd.notna(value) and value != '':
-                                                            # Если значение уже в процентах (например, 45.7), используем его
-                                                            summary_data['Отток из сети %'][cohort] = float(value)
-                                                        else:
-                                                            # Вычисляем процент вручную
-                                                            cohort_size = summary_data['Кол-во клиентов в когорте'].get(cohort, 0)
-                                                            network_churn = summary_data['Отток из сети'].get(cohort, 0)
-                                                            if cohort_size > 0:
-                                                                percent = (network_churn / cohort_size) * 100
-                                                                summary_data['Отток из сети %'][cohort] = percent
-                                                            else:
-                                                                summary_data['Отток из сети %'][cohort] = 0.0
-                                                    except (KeyError, IndexError, ValueError):
-                                                        # Вычисляем процент вручную при ошибке
-                                                        cohort_size = summary_data['Кол-во клиентов в когорте'].get(cohort, 0)
-                                                        network_churn = summary_data['Отток из сети'].get(cohort, 0)
-                                                        if cohort_size > 0:
-                                                            percent = (network_churn / cohort_size) * 100
-                                                            summary_data['Отток из сети %'][cohort] = percent
-                                                        else:
-                                                            summary_data['Отток из сети %'][cohort] = 0.0
-                                        else:
-                                            # Вычисляем процент вручную, если строка отсутствует
-                                            for cohort in sorted_periods:
-                                                cohort_size = summary_data['Кол-во клиентов в когорте'].get(cohort, 0)
-                                                network_churn = summary_data['Отток из сети'].get(cohort, 0)
-                                                if cohort_size > 0:
-                                                    percent = (network_churn / cohort_size) * 100
-                                                    summary_data['Отток из сети %'][cohort] = percent
-                                                else:
-                                                    summary_data['Отток из сети %'][cohort] = 0.0
+                                                    value = category_summary.loc['Доля оттока из сети от когорты', cohort]
+                                                    if pd.notna(value):
+                                                        summary_data['Отток из сети %'][cohort] = value
                                         
                                     # Создаем DataFrame
                                     summary_df = pd.DataFrame(summary_data, index=sorted_periods).T
                                     summary_df.index.name = 'Метрика / Когорта'
                                     
                                     # Записываем в Excel
-                                    summary_df.to_excel(writer, sheet_name="7. Сводная таблица по всем когортам", startrow=0, index=True)
-                                    worksheet_summary = writer.sheets["7. Сводная таблица по всем когортам"]
+                                    summary_df.to_excel(writer, sheet_name="8. Сводная таблица по всем когортам", startrow=0, index=True)
+                                    worksheet_summary = writer.sheets["8. Сводная таблица по всем когортам"]
                                     
                                     # Форматируем таблицу
                                     for row_idx in range(2, len(summary_df.index) + 2):
@@ -1892,8 +1807,8 @@ if uploaded_file is not None:
                         # Создаем колонки для горизонтального размещения кнопок
                         col_excel_button, col_pdf_button = st.columns(2)
                         
-                        # Генерируем отчет заново при каждом рендеринге на основе доступных данных
-                        # Если данные о категориях загружены - они будут включены, если нет - отчет будет без них
+                        # Генерируем файл каждый раз при рендеринге (данные могут обновиться)
+                        # Всегда генерируем отчет заново, чтобы включить все актуальные данные
                         try:
                             excel_data_full = create_full_report_excel()
                             # Сохраняем для возможного использования в будущем
@@ -1908,18 +1823,13 @@ if uploaded_file is not None:
                                 excel_data_full = b""  # Пустой файл
                         
                         with col_excel_button:
-                            # Используем ключ, который меняется при загрузке данных о категориях
-                            # Это заставит кнопку перерендериться с новым отчетом
-                            has_categories = 'df_categories' in st.session_state and st.session_state.df_categories is not None
-                            download_key = f"download_full_report_{has_categories}_{len(excel_data_full) if excel_data_full else 0}"
-                            
                             st.download_button(
                                 label="📥 Скачать полный отчёт в Excel",
                                 data=excel_data_full,
                                 file_name=f"полный_отчёт_когортный_анализ_{info['first_period']}_{info['last_period']}.xlsx",
                                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                                 use_container_width=True,
-                                key=download_key
+                                key="download_full_report"
                             )
                         
                         # Создаем функцию для генерации аналитического PDF отчёта
@@ -2283,13 +2193,6 @@ if uploaded_file is not None:
                 
                 # Отображение матрицы (только если данные готовы)
                 if info:
-                    # Получаем данные из session state для использования в блоке
-                    df = st.session_state.df
-                    year_month_col = st.session_state.year_month_col
-                    client_col = st.session_state.client_col
-                    sorted_periods = st.session_state.sorted_periods
-                    cohort_matrix = st.session_state.cohort_matrix
-                    
                     # Уменьшаем отступ перед блоком матриц
                     st.markdown("<div style='margin-top: 5px;'></div>", unsafe_allow_html=True)
                     
@@ -2800,8 +2703,7 @@ if uploaded_file is not None:
                             
                             if selected_cohort:
                                 period_clients_cache = st.session_state.get('period_clients_cache', None)
-                                accumulation_matrix = st.session_state.get('accumulation_matrix', None)
-                                churn_clients = get_churn_clients(df, year_month_col, client_col, sorted_periods, selected_cohort, period_clients_cache, accumulation_matrix=accumulation_matrix)
+                                churn_clients = get_churn_clients(df, year_month_col, client_col, sorted_periods, selected_cohort, period_clients_cache)
                                 
                                 if churn_clients:
                                     st.write(f"**Найдено: {len(churn_clients)}**")
@@ -2818,24 +2720,15 @@ if uploaded_file is not None:
                                     st.info(f"❌ Нет данных")
                                 
                                 # Кнопка для скачивания всех когорт (всегда видна)
-                                # Собираем клиентов оттока из всех когорт (тех, кто не вернулся после периода когорты)
-                                all_churn_clients_list = []
-                                
+                                all_churn_clients = set()
                                 for cohort in sorted_periods:
-                                    # Используем ТОЧНО ТУ ЖЕ функцию с ТЕМИ ЖЕ параметрами, что и в работающей кнопке выше (строка 2804)
-                                    cohort_churn = get_churn_clients(df, year_month_col, client_col, sorted_periods, cohort, period_clients_cache, accumulation_matrix=accumulation_matrix)
-                                    # Добавляем всех клиентов оттока из этой когорты
-                                    if cohort_churn:
-                                        all_churn_clients_list.extend(cohort_churn)
+                                    cohort_churn = get_churn_clients(df, year_month_col, client_col, sorted_periods, cohort, period_clients_cache)
+                                    all_churn_clients.update(cohort_churn)
                                 
-                                # НЕ фильтруем и НЕ удаляем дубликаты - просто собираем всех клиентов оттока из всех когорт
-                                # Это соответствует сумме по столбцу "Отток кол-во" (если клиент отток из нескольких когорт, он будет несколько раз)
-                                if all_churn_clients_list:
-                                    # Преобразуем в отсортированный список для вывода
-                                    all_churn_clients_sorted = sorted([str(client) for client in all_churn_clients_list])
-                                    all_clients_csv = "\n".join(all_churn_clients_sorted)
+                                if all_churn_clients:
+                                    all_clients_csv = "\n".join([str(client) for client in sorted(all_churn_clients)])
                                     st.download_button(
-                                        label=f"💾 Скачать коды клиентов оттока всех когорт ({len(all_churn_clients_list)})",
+                                        label=f"💾 Скачать коды клиентов оттока всех когорт ({len(all_churn_clients)})",
                                         data=all_clients_csv,
                                         file_name=f"отток_клиентов_все_когорты.txt",
                                         mime="text/plain",
@@ -2916,22 +2809,19 @@ if uploaded_file is not None:
                                     group_col = col
                                     break
                             
-                            # Ищем столбец Год-месяц, Год-неделя или Неделя
+                            # Ищем столбец Год-месяц
                             for col in df_categories.columns:
                                 col_lower = str(col).lower().strip()
-                                if ('год' in col_lower and ('месяц' in col_lower or 'неделя' in col_lower)) or \
-                                   ('год-месяц' in col_lower) or ('год-неделя' in col_lower) or \
-                                   (col_lower == 'неделя' or (col_lower.startswith('неделя') and len(col_lower.split()) == 1)):
+                                if ('год' in col_lower and 'месяц' in col_lower) or ('год-месяц' in col_lower):
                                     year_month_col = col
                                     break
                             
-                            # Ищем столбец месяц (если не нашли год-месяц)
-                            if year_month_col is None:
-                                for col in df_categories.columns:
-                                    col_lower = str(col).lower().strip()
-                                    if col_lower == 'месяц' or (col_lower.startswith('месяц') and len(col_lower.split()) == 1):
-                                        month_col = col
-                                        break
+                            # Ищем столбец месяц
+                            for col in df_categories.columns:
+                                col_lower = str(col).lower().strip()
+                                if col_lower == 'месяц' or (col_lower.startswith('месяц') and len(col_lower.split()) == 1):
+                                    month_col = col
+                                    break
                             
                             # Ищем столбец Клиентов
                             for col in df_categories.columns:
@@ -2953,7 +2843,7 @@ if uploaded_file is not None:
                             elif client_code_col is None:
                                 st.error("❌ Не найден столбец 'Код клиента'. Убедитесь, что в файле есть столбец с названием, содержащим 'Код' и 'клиент'.")
                             elif year_month_col is None:
-                                st.warning("⚠️ Не найден столбец с периодом ('Год-месяц', 'Год-неделя' или 'Неделя'). Данные будут обработаны без фильтрации по периоду.")
+                                st.warning("⚠️ Не найден столбец 'Год-месяц'. Данные будут обработаны без фильтрации по периоду.")
                             else:
                                 # Получаем уникальные категории
                                 categories = df_categories[group_col].dropna().unique()
@@ -3078,124 +2968,16 @@ if uploaded_file is not None:
                                 st.session_state.category_summary_table = summary_table_excel
                                 st.session_state.category_cohort_table = None
                                 
-                                # Предварительно создаем таблицы присутствия клиентов оттока для всех когорт
-                                # и сохраняем их в session_state для использования в Excel экспорте
-                                churn_presence_tables = {}
-                                period_clients_cache = st.session_state.get('period_clients_cache', None)
-                                period_indices = {period: idx for idx, period in enumerate(sorted_periods)}
-                                
-                                for cohort_period in sorted_periods:
-                                    # Получаем клиентов оттока для когорты
-                                    churn_clients_list = get_churn_clients(
-                                        df, year_month_col, client_col, sorted_periods, 
-                                        cohort_period, period_clients_cache, period_indices
-                                    )
-                                    churn_clients_set = {str(client) for client in churn_clients_list}
-                                    
-                                    # Определяем периоды начиная с этой когорты
-                                    cohort_index_cohort = period_indices.get(cohort_period, 0)
-                                    periods_from_cohort_cohort = sorted_periods[cohort_index_cohort:]
-                                    
-                                    # Создаем таблицу: категории по строкам, периоды по столбцам
-                                    category_period_table = pd.DataFrame(index=categories, columns=periods_from_cohort_cohort)
-                                    
-                                    # Словари для итогов
-                                    period_unique_clients = {period: set() for period in periods_from_cohort_cohort}
-                                    category_unique_clients = {category: set() for category in categories}
-                                    
-                                    # Заполняем таблицу
-                                    if year_month_col is not None:
-                                        for period in periods_from_cohort_cohort:
-                                            for category in categories:
-                                                if category in category_period_index and period in category_period_index[category]:
-                                                    category_period_clients = category_period_index[category][period]
-                                                else:
-                                                    category_period_clients = set()
-                                                
-                                                intersection = churn_clients_set & category_period_clients
-                                                category_period_table.loc[category, period] = len(intersection)
-                                                
-                                                period_unique_clients[period].update(intersection)
-                                                category_unique_clients[category].update(intersection)
-                                    else:
-                                        category_clients_dict = {}
-                                        for category in categories:
-                                            if category in category_period_index and 'all' in category_period_index[category]:
-                                                category_clients_dict[category] = category_period_index[category]['all']
-                                            else:
-                                                category_clients_dict[category] = set()
-                                        
-                                        for period in periods_from_cohort_cohort:
-                                            for category in categories:
-                                                category_clients_set = category_clients_dict.get(category, set())
-                                                intersection = churn_clients_set & category_clients_set
-                                                category_period_table.loc[category, period] = len(intersection)
-                                                
-                                                period_unique_clients[period].update(intersection)
-                                                category_unique_clients[category].update(intersection)
-                                    
-                                    # Заполняем NaN нулями
-                                    category_period_table = category_period_table.fillna(0).astype(int)
-                                    
-                                    # Создаем итоговую строку и столбец
-                                    totals_row = pd.Series(
-                                        {period: len(period_unique_clients[period]) for period in periods_from_cohort_cohort},
-                                        name='Итого клиентов'
-                                    )
-                                    
-                                    totals_col = pd.Series(
-                                        {category: len(category_unique_clients[category]) for category in categories},
-                                        name='Итого'
-                                    )
-                                    
-                                    # Добавляем итоги в таблицу
-                                    category_period_table_with_totals = category_period_table.copy()
-                                    category_period_table_with_totals.loc['Итого клиентов'] = totals_row
-                                    category_period_table_with_totals['Итого'] = totals_col
-                                    
-                                    # Вычисляем значение для ячейки пересечения
-                                    all_category_clients = set()
-                                    if year_month_col is not None:
-                                        for category in categories:
-                                            if category in category_period_index:
-                                                for period in periods_from_cohort_cohort:
-                                                    if period in category_period_index[category]:
-                                                        all_category_clients.update(category_period_index[category][period])
-                                    else:
-                                        for category in categories:
-                                            if category in category_period_index and 'all' in category_period_index[category]:
-                                                all_category_clients.update(category_period_index[category]['all'])
-                                    
-                                    present_in_categories = churn_clients_set & all_category_clients
-                                    category_period_table_with_totals.loc['Итого клиентов', 'Итого'] = len(present_in_categories)
-                                    
-                                    # Переупорядочиваем строки и столбцы
-                                    new_index = ['Итого клиентов'] + [cat for cat in categories]
-                                    category_period_table_with_totals = category_period_table_with_totals.reindex(new_index)
-                                    new_columns = ['Итого'] + list(periods_from_cohort_cohort)
-                                    category_period_table_with_totals = category_period_table_with_totals[new_columns]
-                                    
-                                    # Сохраняем таблицу для этой когорты
-                                    churn_presence_tables[cohort_period] = category_period_table_with_totals
-                                
-                                # Сохраняем все таблицы в session_state
-                                st.session_state.churn_presence_tables = churn_presence_tables
-                                
                                 # Обновляем Excel отчёт после сохранения всех данных
                                 if 'excel_report_cache_key' in st.session_state:
                                     del st.session_state.excel_report_cache_key
                                 
                                 # Перегенерируем Excel отчёт после сохранения данных о категориях
+                                # Используем st.rerun() для обновления, но только если данные изменились
+                                # Вместо этого просто перегенерируем отчет
                                 try:
-                                    # Генерируем отчет с учетом всех загруженных данных
+                                    # Небольшая задержка для гарантии сохранения данных
                                     st.session_state.excel_report_data = create_full_report_excel()
-                                    # Сохраняем флаг, что данные о категориях загружены
-                                    st.session_state.categories_data_loaded = True
-                                    # Перерендерим страницу, чтобы кнопка скачивания обновилась с новым отчетом
-                                    # Используем проверку, чтобы rerun вызывался только один раз
-                                    if 'categories_rerun_done' not in st.session_state:
-                                        st.session_state.categories_rerun_done = True
-                                        st.rerun()
                                 except Exception as e:
                                     st.warning(f"Не удалось обновить Excel отчёт: {str(e)}")
                                 
