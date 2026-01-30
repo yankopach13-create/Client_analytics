@@ -32,25 +32,41 @@ st.set_page_config(
     layout="wide"
 )
 
-# Функция для создания кнопки копирования в буфер обмена
+# Функция для создания кнопки копирования в буфер обмена (визуально идентична st.download_button)
 def create_copy_button(text, button_label, key):
-    """Создает кнопку для копирования текста в буфер обмена"""
+    """Создает кнопку для копирования текста в буфер обмена, визуально идентичную st.download_button"""
     import streamlit.components.v1 as components
     
     html = f"""
-    <div style="margin: 10px 0;">
+    <div data-testid="stDownloadButton" style="width: 100%;">
         <button onclick="copyToClipboard_{key}()" style="
             width: 100%;
-            padding: 0.5rem 1rem;
-            background-color: #1f77b4;
-            color: white;
-            border: none;
-            border-radius: 0.25rem;
+            padding: 15px 30px;
+            background: #f8f9fa;
+            color: #333;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
             cursor: pointer;
-            font-size: 1rem;
-            font-weight: 500;
-        ">{button_label}</button>
-        <div id="copy_status_{key}" style="margin-top: 5px; color: green; font-size: 0.9rem; display: none;">✓ Скопировано!</div>
+            font-weight: 700;
+            font-size: 1.1rem;
+            line-height: 1.3;
+            text-align: center;
+            min-height: 60px;
+            height: auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            white-space: normal;
+            word-wrap: break-word;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+            transition: all 0.3s ease;
+            margin: 0;
+        " onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 8px rgba(0, 0, 0, 0.1)'; this.style.background='#ffffff'; this.style.borderColor='#d0d0d0';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 2px 4px rgba(0, 0, 0, 0.05)'; this.style.background='#f8f9fa'; this.style.borderColor='#e0e0e0';" onmousedown="this.style.transform='translateY(0)'; this.style.boxShadow='0 2px 4px rgba(0, 0, 0, 0.05)';" onmouseup="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 8px rgba(0, 0, 0, 0.1)';">
+            <div style="display: flex; align-items: center; justify-content: center;">
+                <p style="margin: 0; padding: 0; font-size: 1.1rem; font-weight: 700;">{button_label}</p>
+            </div>
+        </button>
+        <div id="copy_status_{key}" style="margin-top: 5px; color: rgb(0, 128, 0); font-size: 0.875rem; display: none; text-align: center;">✓ Скопировано!</div>
         <textarea id="copy_text_{key}" style="display: none;">{text}</textarea>
     </div>
     <script>
@@ -80,7 +96,7 @@ def create_copy_button(text, button_label, key):
         }}
     </script>
     """
-    components.html(html, height=60)
+    components.html(html, height=80)
 
 st.title("📊 Когортный анализ, возвращаемость и отток")
 st.markdown("---")
@@ -2994,16 +3010,6 @@ if uploaded_file is not None:
                                 # Новый интерфейс: слева выбор когорты, справа таблица
                                 st.markdown("### 📊 Присутствие клиентов оттока когорты в других категориях товаров")
                                 
-                                # Кнопка копирования всех кодов клиентов оттока из сети
-                                if all_network_churn_clients:
-                                    all_network_churn_clients_list = sorted(list(all_network_churn_clients))
-                                    all_network_churn_clients_csv = "\n".join([str(client) for client in all_network_churn_clients_list])
-                                    create_copy_button(
-                                        all_network_churn_clients_csv,
-                                        f"📋 Копировать все коды клиентов оттока из сети ({len(all_network_churn_clients_list)})",
-                                        "copy_all_network_churn_clients"
-                                    )
-                                
                                 col_cohort_select, col_table = st.columns([1, 4])
                                 
                                 with col_cohort_select:
@@ -3078,7 +3084,7 @@ if uploaded_file is not None:
                                     """
                                     st.markdown(metrics_html, unsafe_allow_html=True)
                                     
-                                    # Кнопка копирования кодов клиентов оттока из сети
+                                    # Кнопка копирования кодов клиентов оттока из сети для выбранной когорты
                                     if network_churn_clients_list:
                                         network_churn_clients_csv = "\n".join([str(client) for client in network_churn_clients_list])
                                         create_copy_button(
@@ -3088,6 +3094,16 @@ if uploaded_file is not None:
                                         )
                                     else:
                                         st.info("ℹ️ Отток из сети равен 0 или все клиенты оттока присутствуют в других категориях")
+                                    
+                                    # Кнопка копирования всех кодов клиентов оттока из сети (для всех когорт)
+                                    if all_network_churn_clients:
+                                        all_network_churn_clients_list = sorted(list(all_network_churn_clients))
+                                        all_network_churn_clients_csv = "\n".join([str(client) for client in all_network_churn_clients_list])
+                                        create_copy_button(
+                                            all_network_churn_clients_csv,
+                                            f"📋 Копировать все коды клиентов оттока из сети ({len(all_network_churn_clients_list)})",
+                                            "copy_all_network_churn_clients"
+                                        )
                                 
                                 with col_table:
                                     # Определяем периоды ПОСЛЕ выбранной когорты (для использования в таблице)
