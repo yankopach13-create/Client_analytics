@@ -846,19 +846,59 @@ def get_accumulation_clients(df, year_month_col, client_col, sorted_periods, coh
     
     return sorted(list(returned_clients))
 
-def get_churn_clients(df, year_month_col, client_col, sorted_periods, cohort_period, period_clients_cache=None):
-    """Получает коды клиентов оттока из когорты (те, кто не вернулся ни разу после периода когорты)"""
+def get_client_cohorts(df, year_month_col, client_col, sorted_periods):
+    """
+    Определяет когорту для каждого клиента (первый период появления)
+    Returns: словарь {client: cohort_period}
+    """
+    client_cohorts = {}
+    period_indices = {period: idx for idx, period in enumerate(sorted_periods)}
+    
+    # Группируем данные по клиентам и находим первый период для каждого
+    for client in df[client_col].dropna().unique():
+        client_data = df[df[client_col] == client]
+        client_periods = client_data[year_month_col].dropna().unique()
+        
+        # Находим первый период появления клиента
+        first_period = None
+        first_period_idx = len(sorted_periods)
+        
+        for period in client_periods:
+            if period in period_indices:
+                period_idx = period_indices[period]
+                if period_idx < first_period_idx:
+                    first_period_idx = period_idx
+                    first_period = period
+        
+        if first_period is not None:
+            client_cohorts[client] = first_period
+    
+    return client_cohorts
+
+def get_churn_clients(df, year_month_col, client_col, sorted_periods, cohort_period, period_clients_cache=None, client_cohorts_cache=None):
+    """
+    Получает коды клиентов оттока из когорты (те, кто не вернулся ни разу после периода когорты)
+    Важно: когорта определяется как первый период появления клиента, а не просто все клиенты из периода
+    """
     period_indices = {period: idx for idx, period in enumerate(sorted_periods)}
     cohort_idx = period_indices.get(cohort_period, -1)
     
     if cohort_idx < 0:
         return []
     
-    # Получаем множество всех клиентов этой когорты
-    if period_clients_cache:
-        cohort_clients = period_clients_cache.get(cohort_period, set())
-    else:
-        cohort_clients = set(df[df[year_month_col] == cohort_period][client_col].dropna().unique())
+    # Получаем когорты клиентов (если кэш не передан, вычисляем)
+    if client_cohorts_cache is None:
+        client_cohorts_cache = get_client_cohorts(df, year_month_col, client_col, sorted_periods)
+    
+    # Получаем множество клиентов, для которых указанный период является их когортой (первым появлением)
+    cohort_clients = set()
+    for client, client_cohort in client_cohorts_cache.items():
+        if client_cohort == cohort_period:
+            cohort_clients.add(client)
+    
+    # Если когорта пустая, возвращаем пустой список
+    if not cohort_clients:
+        return []
     
     # Находим всех клиентов когорты, которые вернулись хотя бы раз в любом периоде после когорты
     returned_clients = set()
@@ -873,29 +913,53 @@ def get_churn_clients(df, year_month_col, client_col, sorted_periods, cohort_per
     churn_clients = cohort_clients - returned_clients
     return sorted(list(churn_clients))
 
-def build_churn_table(df, year_month_col, client_col, sorted_periods, cohort_matrix, accumulation_matrix, accumulation_percent_matrix):
-    """Строит таблицу оттока клиентов для всех когорт"""
+def build_churn_table(df, year_month_col, client_col, sorted_periods, cohort_matrix, accumulation_matrix, accumulation_percent_matrix, client_cohorts_cache=None):
+    """
+    Строит таблицу оттока клиентов для всех когорт
+    Важно: когорта определяется как первый период появления клиента
+    """
     churn_data = []
+    
+    # Получаем когорты клиентов (если кэш не передан, вычисляем)
+    if client_cohorts_cache is None:
+        client_cohorts_cache = get_client_cohorts(df, year_month_col, client_col, sorted_periods)
     
     # Оптимизация: создаём period_indices один раз вне цикла
     period_indices = {period: idx for idx, period in enumerate(sorted_periods)}
     last_period = sorted_periods[-1]
     last_period_idx = period_indices[last_period]
     
+    # Подсчитываем размер каждой когорты (количество клиентов, для которых этот период - первый)
+    cohort_sizes = {}
+    for client, client_cohort in client_cohorts_cache.items():
+        if client_cohort not in cohort_sizes:
+            cohort_sizes[client_cohort] = 0
+        cohort_sizes[client_cohort] += 1
+    
     for cohort_period in sorted_periods:
         # 1. Когорта
         cohort = cohort_period
         
-        # 2. Кол-во клиентов когорты
-        cohort_size = cohort_matrix.loc[cohort_period, cohort_period]
+        # 2. Кол-во клиентов когорты (только тех, для кого это первый период)
+        cohort_size = cohort_sizes.get(cohort_period, 0)
         
         # 3. Накопительное кол-во возврата за весь период
         # Берем последний столбец (последний период) для этой когорты
         cohort_idx = period_indices[cohort_period]
         
         if last_period_idx > cohort_idx:
-            # Если есть периоды после когорты, берем значение из матрицы накопления
-            total_returned = accumulation_matrix.loc[cohort_period, last_period]
+            # Если есть периоды после когорты, считаем возврат вручную
+            # Получаем клиентов этой когорты
+            cohort_clients = {client for client, client_cohort in client_cohorts_cache.items() if client_cohort == cohort_period}
+            
+            # Находим клиентов, которые вернулись хотя бы раз после когорты
+            returned_clients = set()
+            for period in sorted_periods[cohort_idx + 1:]:
+                period_data = df[df[year_month_col] == period]
+                period_clients = set(period_data[client_col].dropna().unique())
+                returned_clients.update(cohort_clients & period_clients)
+            
+            total_returned = len(returned_clients)
         else:
             # Если это последняя когорта, возврат = 0
             total_returned = 0
@@ -1225,6 +1289,10 @@ if uploaded_file is not None:
                                 period_clients_cache[period] = set(period_data[client_col].dropna().unique())
                             st.session_state.period_clients_cache = period_clients_cache
                             
+                            # Кэшируем когорты клиентов (первый период появления каждого клиента)
+                            client_cohorts_cache = get_client_cohorts(df, year_month_col, client_col, sorted_periods)
+                            st.session_state.client_cohorts_cache = client_cohorts_cache
+                            
                             # Вычисляем статистику по диагонали (количество клиентов в каждом периоде)
                             diagonal_values = {period: cohort_matrix.loc[period, period] for period in sorted_periods}
                             
@@ -1253,7 +1321,12 @@ if uploaded_file is not None:
                             st.session_state.accumulation_matrix = build_accumulation_matrix(df, year_month_col, client_col, sorted_periods)
                             st.session_state.accumulation_percent_matrix = build_accumulation_percent_matrix(st.session_state.accumulation_matrix, cohort_matrix)
                             st.session_state.inflow_matrix = build_inflow_matrix(st.session_state.accumulation_percent_matrix)
-                            st.session_state.churn_table = build_churn_table(df, year_month_col, client_col, sorted_periods, cohort_matrix, st.session_state.accumulation_matrix, st.session_state.accumulation_percent_matrix)
+                            
+                            # Кэшируем когорты клиентов (первый период появления каждого клиента)
+                            client_cohorts_cache = get_client_cohorts(df, year_month_col, client_col, sorted_periods)
+                            st.session_state.client_cohorts_cache = client_cohorts_cache
+                            
+                            st.session_state.churn_table = build_churn_table(df, year_month_col, client_col, sorted_periods, cohort_matrix, st.session_state.accumulation_matrix, st.session_state.accumulation_percent_matrix, client_cohorts_cache)
                             
                             # Кэшируем множества клиентов по периодам для быстрого доступа в функциях получения клиентов
                             period_clients_cache = {}
@@ -1276,7 +1349,11 @@ if uploaded_file is not None:
                     if st.session_state.get('inflow_matrix') is None:
                         st.session_state.inflow_matrix = build_inflow_matrix(st.session_state.accumulation_percent_matrix)
                     if st.session_state.get('churn_table') is None:
-                        st.session_state.churn_table = build_churn_table(df, year_month_col, client_col, sorted_periods, cohort_matrix, st.session_state.accumulation_matrix, st.session_state.accumulation_percent_matrix)
+                        client_cohorts_cache = st.session_state.get('client_cohorts_cache')
+                        if client_cohorts_cache is None:
+                            client_cohorts_cache = get_client_cohorts(df, year_month_col, client_col, sorted_periods)
+                            st.session_state.client_cohorts_cache = client_cohorts_cache
+                        st.session_state.churn_table = build_churn_table(df, year_month_col, client_col, sorted_periods, cohort_matrix, st.session_state.accumulation_matrix, st.session_state.accumulation_percent_matrix, client_cohorts_cache)
                     
                     # Создаем кэш множеств клиентов, если его еще нет
                     if st.session_state.get('period_clients_cache') is None:
@@ -1285,6 +1362,11 @@ if uploaded_file is not None:
                             period_data = df[df[year_month_col] == period]
                             period_clients_cache[period] = set(period_data[client_col].dropna().unique())
                         st.session_state.period_clients_cache = period_clients_cache
+                    
+                    # Создаем кэш когорт клиентов, если его еще нет
+                    if st.session_state.get('client_cohorts_cache') is None:
+                        client_cohorts_cache = get_client_cohorts(df, year_month_col, client_col, sorted_periods)
+                        st.session_state.client_cohorts_cache = client_cohorts_cache
                 
                 # Получаем информацию из session state
                 info = st.session_state.cohort_info
@@ -1453,7 +1535,8 @@ if uploaded_file is not None:
                                         
                                         # Получаем клиентов оттока для выбранной когорты
                                         period_clients_cache = st.session_state.get('period_clients_cache', None)
-                                        churn_clients_set = set(get_churn_clients(df, year_month_col, client_col, sorted_periods, selected_cohort, period_clients_cache))
+                                        client_cohorts_cache = st.session_state.get('client_cohorts_cache', None)
+                                        churn_clients_set = set(get_churn_clients(df, year_month_col, client_col, sorted_periods, selected_cohort, period_clients_cache, client_cohorts_cache))
                                         churn_clients_set = {str(client) for client in churn_clients_set}
                                         
                                         # Создаем таблицу: категории по строкам, периоды по столбцам
@@ -2631,7 +2714,8 @@ if uploaded_file is not None:
                             
                             if selected_cohort:
                                 period_clients_cache = st.session_state.get('period_clients_cache', None)
-                                churn_clients = get_churn_clients(df, year_month_col, client_col, sorted_periods, selected_cohort, period_clients_cache)
+                                client_cohorts_cache = st.session_state.get('client_cohorts_cache', None)
+                                churn_clients = get_churn_clients(df, year_month_col, client_col, sorted_periods, selected_cohort, period_clients_cache, client_cohorts_cache)
                                 
                                 if churn_clients:
                                     st.write(f"**Найдено: {len(churn_clients)}**")
@@ -2649,8 +2733,9 @@ if uploaded_file is not None:
                                 
                                 # Кнопка для скачивания всех когорт (всегда видна)
                                 all_churn_clients = set()
+                                client_cohorts_cache = st.session_state.get('client_cohorts_cache', None)
                                 for cohort in sorted_periods:
-                                    cohort_churn = get_churn_clients(df, year_month_col, client_col, sorted_periods, cohort, period_clients_cache)
+                                    cohort_churn = get_churn_clients(df, year_month_col, client_col, sorted_periods, cohort, period_clients_cache, client_cohorts_cache)
                                     all_churn_clients.update(cohort_churn)
                                 
                                 if all_churn_clients:
@@ -2808,9 +2893,10 @@ if uploaded_file is not None:
                                 
                                 # Для каждой когорты рассчитываем метрики
                                 churn_table = st.session_state.churn_table
+                                client_cohorts_cache = st.session_state.get('client_cohorts_cache', None)
                                 for cohort_period in sorted_periods:
                                     # Получаем клиентов оттока для этой когорты
-                                    churn_clients_set_cohort = set(get_churn_clients(df, year_month_col, client_col, sorted_periods, cohort_period, period_clients_cache))
+                                    churn_clients_set_cohort = set(get_churn_clients(df, year_month_col, client_col, sorted_periods, cohort_period, period_clients_cache, client_cohorts_cache))
                                     churn_clients_set_cohort = {str(client) for client in churn_clients_set_cohort}
                                     
                                     # Получаем отток из категории для этой когорты
@@ -2897,7 +2983,8 @@ if uploaded_file is not None:
                                     periods_after_cohort = periods_from_cohort[1:] if len(periods_from_cohort) > 1 else []
                                     
                                     # Получаем клиентов оттока для выбранной когорты
-                                    churn_clients_set = set(get_churn_clients(df, year_month_col, client_col, sorted_periods, selected_cohort, period_clients_cache))
+                                    client_cohorts_cache = st.session_state.get('client_cohorts_cache', None)
+                                    churn_clients_set = set(get_churn_clients(df, year_month_col, client_col, sorted_periods, selected_cohort, period_clients_cache, client_cohorts_cache))
                                     churn_clients_set = {str(client) for client in churn_clients_set}
                                     
                                     # Получаем размер когорты и отток из churn_table
