@@ -32,26 +32,31 @@ st.set_page_config(
     layout="wide"
 )
 
-# Функция для создания кнопки копирования в буфер обмена (визуально идентична st.download_button)
+# Функция для создания кнопки копирования в буфер обмена
 def create_copy_button(text, button_label, key):
-    """Создает кнопку для копирования текста в буфер обмена, визуально идентичную st.download_button"""
+    """Создает кнопку для копирования текста в буфер обмена"""
     import streamlit.components.v1 as components
+    import json
+    
+    # Экранируем текст для безопасной вставки в JavaScript
+    # Используем JSON для правильного экранирования
+    text_json = json.dumps(text)
     
     html = f"""
-    <div data-testid="stDownloadButton" style="width: 100%;">
+    <div style="width: 100%; margin: 5px 0;">
         <button onclick="copyToClipboard_{key}()" style="
             width: 100%;
-            padding: 15px 30px;
+            padding: 8px 16px;
             background: #f8f9fa;
             color: #333;
             border: 2px solid #e0e0e0;
             border-radius: 8px;
             cursor: pointer;
-            font-weight: 700;
-            font-size: 1.1rem;
+            font-weight: 600;
+            font-size: 0.9rem;
             line-height: 1.3;
             text-align: center;
-            min-height: 60px;
+            min-height: 40px;
             height: auto;
             display: flex;
             align-items: center;
@@ -63,40 +68,64 @@ def create_copy_button(text, button_label, key):
             margin: 0;
         " onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 8px rgba(0, 0, 0, 0.1)'; this.style.background='#ffffff'; this.style.borderColor='#d0d0d0';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 2px 4px rgba(0, 0, 0, 0.05)'; this.style.background='#f8f9fa'; this.style.borderColor='#e0e0e0';" onmousedown="this.style.transform='translateY(0)'; this.style.boxShadow='0 2px 4px rgba(0, 0, 0, 0.05)';" onmouseup="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 8px rgba(0, 0, 0, 0.1)';">
             <div style="display: flex; align-items: center; justify-content: center;">
-                <p style="margin: 0; padding: 0; font-size: 1.1rem; font-weight: 700;">{button_label}</p>
+                <p style="margin: 0; padding: 0; font-size: 0.9rem; font-weight: 600;">{button_label}</p>
             </div>
         </button>
-        <div id="copy_status_{key}" style="margin-top: 5px; color: rgb(0, 128, 0); font-size: 0.875rem; display: none; text-align: center;">✓ Скопировано!</div>
-        <textarea id="copy_text_{key}" style="display: none;">{text}</textarea>
+        <div id="copy_status_{key}" style="margin-top: 5px; color: rgb(0, 128, 0); font-size: 0.8rem; display: none; text-align: center;">✓ Скопировано!</div>
     </div>
     <script>
+        const textToCopy_{key} = {text_json};
+        
         function copyToClipboard_{key}() {{
-            const textarea = document.getElementById('copy_text_{key}');
-            textarea.select();
-            textarea.setSelectionRange(0, 99999); // Для мобильных устройств
-            try {{
-                document.execCommand('copy');
-                const status = document.getElementById('copy_status_{key}');
-                status.style.display = 'block';
-                setTimeout(function() {{
-                    status.style.display = 'none';
-                }}, 2000);
-            }} catch(err) {{
-                // Fallback для современных браузеров
-                navigator.clipboard.writeText(textarea.value).then(function() {{
+            const text = textToCopy_{key};
+            
+            // Пробуем использовать современный API
+            if (navigator.clipboard && navigator.clipboard.writeText) {{
+                navigator.clipboard.writeText(text).then(function() {{
                     const status = document.getElementById('copy_status_{key}');
                     status.style.display = 'block';
                     setTimeout(function() {{
                         status.style.display = 'none';
                     }}, 2000);
                 }}).catch(function(err) {{
-                    alert('Ошибка копирования: ' + err);
+                    // Fallback на старый метод
+                    fallbackCopy_{key}(text);
                 }});
+            }} else {{
+                // Fallback для старых браузеров
+                fallbackCopy_{key}(text);
+            }}
+        }}
+        
+        function fallbackCopy_{key}(text) {{
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            textarea.style.position = 'fixed';
+            textarea.style.left = '-999999px';
+            textarea.style.top = '-999999px';
+            document.body.appendChild(textarea);
+            textarea.focus();
+            textarea.select();
+            try {{
+                const successful = document.execCommand('copy');
+                if (successful) {{
+                    const status = document.getElementById('copy_status_{key}');
+                    status.style.display = 'block';
+                    setTimeout(function() {{
+                        status.style.display = 'none';
+                    }}, 2000);
+                }} else {{
+                    alert('Не удалось скопировать. Пожалуйста, скопируйте вручную.');
+                }}
+            }} catch(err) {{
+                alert('Ошибка копирования: ' + err);
+            }} finally {{
+                document.body.removeChild(textarea);
             }}
         }}
     </script>
     """
-    components.html(html, height=80)
+    components.html(html, height=50)
 
 st.title("📊 Когортный анализ, возвращаемость и отток")
 st.markdown("---")
