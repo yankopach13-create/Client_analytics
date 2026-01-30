@@ -43,33 +43,32 @@ def create_copy_button(text, button_label, key):
     text_json = json.dumps(text)
     
     html = f"""
-    <div style="width: 100%; margin: 5px 0;">
+    <div data-testid="stButton" style="width: 100%; margin: 5px 0;">
         <button onclick="copyToClipboard_{key}()" style="
             width: 100%;
             padding: 8px 12px;
-            background: #f8f9fa;
-            color: #333;
-            border: 2px solid #e0e0e0;
-            border-bottom: 2px solid #e0e0e0;
-            border-radius: 8px;
-            cursor: pointer;
-            font-weight: 400;
-            font-size: 0.85rem;
-            line-height: 1.3;
-            text-align: center;
-            min-height: auto;
-            height: auto;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            white-space: normal;
-            word-wrap: break-word;
-            overflow-wrap: break-word;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-            transition: all 0.3s ease;
-            margin: 0;
-            box-sizing: border-box;
-        " onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 8px rgba(0, 0, 0, 0.1)'; this.style.background='#ffffff'; this.style.borderColor='#d0d0d0'; this.style.borderBottomColor='#d0d0d0';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 2px 4px rgba(0, 0, 0, 0.05)'; this.style.background='#f8f9fa'; this.style.borderColor='#e0e0e0'; this.style.borderBottomColor='#e0e0e0';" onmousedown="this.style.transform='translateY(0)'; this.style.boxShadow='0 2px 4px rgba(0, 0, 0, 0.05)';" onmouseup="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 8px rgba(0, 0, 0, 0.1)';">
+            background: #f8f9fa !important;
+            color: #333 !important;
+            border: 2px solid #e0e0e0 !important;
+            border-radius: 8px !important;
+            cursor: pointer !important;
+            font-weight: 400 !important;
+            font-size: 0.85rem !important;
+            line-height: 1.3 !important;
+            text-align: center !important;
+            min-height: auto !important;
+            height: auto !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            white-space: normal !important;
+            word-wrap: break-word !important;
+            overflow-wrap: break-word !important;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05) !important;
+            transition: all 0.3s ease !important;
+            margin: 0 !important;
+            box-sizing: border-box !important;
+        " onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 8px rgba(0, 0, 0, 0.1)'; this.style.background='#ffffff'; this.style.borderColor='#d0d0d0';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 2px 4px rgba(0, 0, 0, 0.05)'; this.style.background='#f8f9fa'; this.style.borderColor='#e0e0e0';" onmousedown="this.style.transform='translateY(0)'; this.style.boxShadow='0 2px 4px rgba(0, 0, 0, 0.05)';" onmouseup="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 8px rgba(0, 0, 0, 0.1)';">
             <div style="display: flex; align-items: center; justify-content: center; width: 100%;">
                 <p style="margin: 0; padding: 0; font-size: 0.85rem; font-weight: 400; line-height: 1.3; word-wrap: break-word; overflow-wrap: break-word; white-space: normal;">{button_label}</p>
             </div>
