@@ -4,12 +4,20 @@ import numpy as np
 import io
 import re
 from datetime import datetime
+import os
+import sys
+
+# Импорты для работы с Excel (используются при экспорте)
 from openpyxl.styles import PatternFill, Font, Alignment
 from openpyxl.utils import get_column_letter
-import matplotlib.pyplot as plt
+
+# Импорты для графиков (используются при необходимости)
 import matplotlib
 matplotlib.use('Agg')  # Используем неинтерактивный бэкенд
+import matplotlib.pyplot as plt
 import seaborn as sns
+
+# Импорты для PDF (используются при создании PDF)
 from reportlab.lib.pagesizes import A4, letter
 from reportlab.lib import colors
 from reportlab.lib.units import inch
@@ -19,11 +27,6 @@ from reportlab.lib.enums import TA_CENTER, TA_LEFT
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 import platform
-import os
-from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.ttfonts import TTFont
-import platform
-import os
 
 # Настройка страницы
 st.set_page_config(
@@ -33,14 +36,17 @@ st.set_page_config(
 )
 
 # Импортируем функции из utils
+# Добавляем родительскую директорию в путь для импорта utils
+_parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _parent_dir not in sys.path:
+    sys.path.insert(0, _parent_dir)
+
 try:
     from utils.copy_button import create_copy_button
 except ImportError:
-    # Если импорт не работает, добавляем путь вручную
-    import sys
-    import os
-    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    from utils.copy_button import create_copy_button
+    # Если импорт не работает, создаем простую заглушку
+    def create_copy_button(text, button_label, key):
+        st.button(button_label, key=key, disabled=True)
 
 
 st.title("📊 Когортный анализ, возвращаемость и отток")
