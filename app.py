@@ -18,11 +18,15 @@ col1, col2, col3 = st.columns(3)
 
 with col1:
     st.markdown("""
-    <div style="text-align: center; padding: 20px; border: 2px solid #4CAF50; border-radius: 10px; background: #f1f8f4;">
-        <h2>📊 Когортный анализ</h2>
-        <p>Анализ возвращаемости и оттока клиентов</p>
-        <p style="color: #4CAF50; font-weight: bold; margin-top: 10px;">✓ Доступен</p>
-    </div>
+    <a href="/pages/1__Когортный_анализ" target="_self" style="text-decoration: none; color: inherit;">
+        <div style="text-align: center; padding: 20px; border: 2px solid #4CAF50; border-radius: 10px; background: #f1f8f4; cursor: pointer; transition: all 0.3s ease;" 
+             onmouseover="this.style.transform='translateY(-5px)'; this.style.boxShadow='0 8px 16px rgba(76, 175, 80, 0.2)';" 
+             onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none';">
+            <h2>📊 Когортный анализ</h2>
+            <p>Анализ возвращаемости и оттока клиентов</p>
+            <p style="color: #4CAF50; font-weight: bold; margin-top: 10px;">✓ Доступен</p>
+        </div>
+    </a>
     """, unsafe_allow_html=True)
 
 with col2:
@@ -44,4 +48,4 @@ with col3:
     """, unsafe_allow_html=True)
 
 st.markdown("---")
-st.info("💡 **Используйте боковое меню слева** для быстрой навигации между инструментами. Все доступные инструменты автоматически отображаются в меню.")
+st.info("💡 Нажмите на карточку инструмента для перехода к нему")
