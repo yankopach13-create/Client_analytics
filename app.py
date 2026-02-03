@@ -18,16 +18,21 @@ col1, col2, col3 = st.columns(3)
 
 with col1:
     st.markdown("""
-    <a href="?page=pages/1__Когортный_анализ" style="text-decoration: none; color: inherit; display: block;">
-        <div style="text-align: center; padding: 20px; border: 2px solid #4CAF50; border-radius: 10px; background: #f1f8f4; cursor: pointer; transition: all 0.3s ease;" 
-             onmouseover="this.style.transform='translateY(-5px)'; this.style.boxShadow='0 8px 16px rgba(76, 175, 80, 0.2)';" 
-             onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none';">
-            <h2>📊 Когортный анализ</h2>
-            <p>Анализ возвращаемости и оттока клиентов</p>
-            <p style="color: #4CAF50; font-weight: bold; margin-top: 10px;">✓ Доступен</p>
-        </div>
-    </a>
+    <div style="text-align: center; padding: 20px; border: 2px solid #4CAF50; border-radius: 10px; background: #f1f8f4;">
+        <h2>📊 Когортный анализ</h2>
+        <p>Анализ возвращаемости и оттока клиентов</p>
+        <p style="color: #4CAF50; font-weight: bold; margin-top: 10px;">✓ Доступен</p>
+    </div>
     """, unsafe_allow_html=True)
+    # Используем кнопку Streamlit для навигации
+    if st.button("📊 Открыть когортный анализ", use_container_width=True, type="primary", key="cohort_nav"):
+        # Используем правильный формат для Streamlit Pages
+        try:
+            # Формат: имя файла без расширения, с префиксом pages/
+            st.switch_page("pages/1__Когортный_анализ")
+        except Exception as e:
+            # Если не работает, показываем сообщение
+            st.error(f"Не удалось перейти на страницу: {str(e)}. Используйте боковое меню слева для навигации.")
 
 with col2:
     st.markdown("""
