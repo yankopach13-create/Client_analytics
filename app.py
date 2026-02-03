@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 
 # Настройка страницы
 st.set_page_config(
@@ -26,22 +27,16 @@ with col1:
     """, unsafe_allow_html=True)
     # Используем кнопку Streamlit для навигации
     if st.button("📊 Открыть когортный анализ", use_container_width=True, type="primary", key="cohort_nav"):
-        # Используем правильный формат для Streamlit Pages
-        # Путь должен быть относительно главного скрипта, включая папку pages/
-        try:
-            # Пробуем с расширением .py
-            st.switch_page("pages/1__Когортный_анализ.py")
-        except:
-            try:
-                # Пробуем без расширения
-                st.switch_page("pages/1__Когортный_анализ")
-            except:
-                # Если не работает, используем JavaScript для навигации
-                st.markdown("""
-                <script>
-                    window.location.href = window.location.origin + '/pages/1__Когортный_анализ';
-                </script>
-                """, unsafe_allow_html=True)
+        # Используем компонент с JavaScript для надежной навигации
+        components.html("""
+        <script>
+            // Получаем текущий URL и формируем путь к странице
+            const currentUrl = window.location.href;
+            const baseUrl = currentUrl.split('?')[0].replace(/\/$/, '');
+            const newUrl = baseUrl + '/pages/1__Когортный_анализ';
+            window.location.href = newUrl;
+        </script>
+        """, height=0)
 
 with col2:
     st.markdown("""
