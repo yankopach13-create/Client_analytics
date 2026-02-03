@@ -1511,6 +1511,43 @@ if uploaded_file is not None:
                             df = st.session_state.df
                             year_month_col = st.session_state.year_month_col
                             client_col = st.session_state.client_col
+                            
+                            # Если второй файл загружен, но данные ещё не обработаны, обрабатываем их на лету
+                            uploaded_file_categories = st.session_state.get('upload_categories_file')
+                            if uploaded_file_categories is not None and ('df_categories' not in st.session_state or st.session_state.df_categories is None):
+                                try:
+                                    # Загружаем и обрабатываем файл на лету
+                                    if uploaded_file_categories.name.endswith('.xlsx'):
+                                        df_categories_temp = pd.read_excel(uploaded_file_categories, engine='openpyxl')
+                                    else:
+                                        df_categories_temp = pd.read_excel(uploaded_file_categories, engine='xlrd')
+                                    
+                                    # Определяем столбцы (упрощённая версия)
+                                    group_col_temp = None
+                                    year_month_col_temp = None
+                                    client_code_col_temp = None
+                                    
+                                    for col in df_categories_temp.columns:
+                                        col_lower = str(col).lower().strip()
+                                        if 'группа' in col_lower and group_col_temp is None:
+                                            group_col_temp = col
+                                        if (('год' in col_lower and 'месяц' in col_lower) or ('год-месяц' in col_lower)) and year_month_col_temp is None:
+                                            year_month_col_temp = col
+                                        if 'код' in col_lower and 'клиент' in col_lower and client_code_col_temp is None:
+                                            client_code_col_temp = col
+                                    
+                                    if group_col_temp and client_code_col_temp:
+                                        categories_temp = sorted([str(cat) for cat in df_categories_temp[group_col_temp].dropna().unique() if str(cat).strip() != ''])
+                                        
+                                        # Сохраняем базовые данные для использования в таблице 7
+                                        st.session_state.df_categories = df_categories_temp
+                                        st.session_state.categories_list = categories_temp
+                                        st.session_state.group_col_name = group_col_temp
+                                        st.session_state.year_month_col_name = year_month_col_temp
+                                        st.session_state.client_code_col_name = client_code_col_temp
+                                except Exception as e:
+                                    # Если не удалось обработать на лету, просто пропускаем таблицу 7
+                                    pass
                         
                             with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
                                 workbook = writer.book
@@ -1583,12 +1620,12 @@ if uploaded_file is not None:
                                                 cell.number_format = '0.0%'  # Процентный формат Excel
                                 
                                 # Таблица 7: Присутствие клиентов оттока когорты в других категориях товаров
-                                # Проверяем наличие загруженного второго файла
-                                # Таблица 7 включается только если второй документ загружен
-                                has_categories_file = st.session_state.get('categories_file_uploaded', False)
+                                # Проверяем наличие загруженного второго файла напрямую через session_state
+                                # Это позволяет определить загружен ли файл, даже если он ещё не обработан
+                                has_categories_file = st.session_state.get('upload_categories_file') is not None
                                 
                                 # Проверяем наличие всех необходимых данных для таблицы 7
-                                # Если файл загружен, данные должны быть обработаны
+                                # Если файл загружен, пытаемся использовать обработанные данные
                                 has_categories_data = (
                                     has_categories_file and
                                     'df_categories' in st.session_state and st.session_state.df_categories is not None and
