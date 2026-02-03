@@ -3158,16 +3158,6 @@ if uploaded_file is not None:
                                         )
                                     else:
                                         st.info("ℹ️ Отток из сети равен 0 или все клиенты оттока присутствуют в других категориях")
-                                    
-                                    # Кнопка копирования всех кодов клиентов оттока из сети (для всех когорт)
-                                    if all_network_churn_clients:
-                                        all_network_churn_clients_list = sorted(list(all_network_churn_clients))
-                                        all_network_churn_clients_csv = "\n".join([str(client) for client in all_network_churn_clients_list])
-                                        create_copy_button(
-                                            all_network_churn_clients_csv,
-                                            f"📋 Копировать все коды клиентов оттока из сети ({len(all_network_churn_clients_list)})",
-                                            "copy_all_network_churn_clients"
-                                        )
                                 
                                 with col_table:
                                     # Определяем периоды ПОСЛЕ выбранной когорты (для использования в таблице)
