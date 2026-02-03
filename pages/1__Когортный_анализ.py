@@ -7,46 +7,68 @@ from datetime import datetime
 import os
 import sys
 
-# Импорты для работы с Excel (используются при экспорте)
-from openpyxl.styles import PatternFill, Font, Alignment
-from openpyxl.utils import get_column_letter
-
-# Импорты для графиков (используются при необходимости)
-import matplotlib
-matplotlib.use('Agg')  # Используем неинтерактивный бэкенд
-import matplotlib.pyplot as plt
-import seaborn as sns
-
-# Импорты для PDF (используются при создании PDF)
-from reportlab.lib.pagesizes import A4, letter
-from reportlab.lib import colors
-from reportlab.lib.units import inch
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image, PageBreak
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.enums import TA_CENTER, TA_LEFT
-from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.ttfonts import TTFont
-import platform
-
-# Настройка страницы
+# Настройка страницы (должна быть в самом начале, до тяжелых импортов)
 st.set_page_config(
     page_title="Когортный анализ",
     page_icon="📊",
     layout="wide"
 )
 
-# Импортируем функции из utils
-# Добавляем родительскую директорию в путь для импорта utils
-_parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-if _parent_dir not in sys.path:
-    sys.path.insert(0, _parent_dir)
-
+# Импортируем функции из utils (безопасный импорт)
 try:
+    # Пробуем импорт напрямую
     from utils.copy_button import create_copy_button
 except ImportError:
-    # Если импорт не работает, создаем простую заглушку
-    def create_copy_button(text, button_label, key):
-        st.button(button_label, key=key, disabled=True)
+    try:
+        # Если не работает, добавляем путь безопасно
+        try:
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+        except:
+            current_dir = os.getcwd()
+        
+        # Определяем родительскую директорию
+        if os.path.basename(current_dir) == 'pages':
+            parent_dir = os.path.dirname(current_dir)
+        else:
+            parent_dir = current_dir
+        
+        if parent_dir not in sys.path:
+            sys.path.insert(0, parent_dir)
+        from utils.copy_button import create_copy_button
+    except ImportError:
+        # Заглушка если импорт не работает
+        def create_copy_button(text, button_label, key):
+            st.button(button_label, key=key, disabled=True)
+
+# Ленивые импорты для тяжелых библиотек (загружаются только при необходимости)
+def _get_openpyxl():
+    """Ленивый импорт openpyxl"""
+    from openpyxl.styles import PatternFill, Font, Alignment
+    from openpyxl.utils import get_column_letter
+    return PatternFill, Font, Alignment, get_column_letter
+
+def _get_matplotlib():
+    """Ленивый импорт matplotlib"""
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    return plt, sns
+
+def _get_reportlab():
+    """Ленивый импорт reportlab"""
+    from reportlab.lib.pagesizes import A4, letter
+    from reportlab.lib import colors
+    from reportlab.lib.units import inch
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image, PageBreak
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.enums import TA_CENTER, TA_LEFT
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.ttfonts import TTFont
+    import platform
+    return (A4, letter, colors, inch, SimpleDocTemplate, Table, TableStyle, 
+            Paragraph, Spacer, Image, PageBreak, getSampleStyleSheet, 
+            ParagraphStyle, TA_CENTER, TA_LEFT, pdfmetrics, TTFont, platform)
 
 
 st.title("📊 Когортный анализ, возвращаемость и отток")
@@ -435,6 +457,7 @@ def apply_excel_color_formatting(worksheet, df, hide_zeros=False):
 
 def apply_excel_cohort_formatting(worksheet, df, sorted_periods):
     """Применяет цветовое форматирование с горизонтальной динамикой к Excel файлу для таблицы когорт"""
+    PatternFill, Font, Alignment, _ = _get_openpyxl()
     period_indices = {period: idx for idx, period in enumerate(sorted_periods)}
     
     # Для горизонтальной динамики рассчитываем min/max/mean для каждой строки отдельно
@@ -523,6 +546,7 @@ def apply_excel_cohort_formatting(worksheet, df, sorted_periods):
 
 def apply_excel_percent_formatting(worksheet, df, sorted_periods):
     """Применяет цветовое форматирование и форматирование процентов к Excel файлу для таблицы накопления в %"""
+    PatternFill, Font, Alignment, _ = _get_openpyxl()
     period_indices = {period: idx for idx, period in enumerate(sorted_periods)}
     
     # Для горизонтальной динамики рассчитываем min/max/mean для каждой строки отдельно
@@ -609,6 +633,7 @@ def apply_excel_percent_formatting(worksheet, df, sorted_periods):
 
 def apply_excel_inflow_formatting(worksheet, df, sorted_periods):
     """Применяет цветовое форматирование и форматирование процентов к Excel файлу для таблицы притока в %"""
+    PatternFill, Font, Alignment, _ = _get_openpyxl()
     period_indices = {period: idx for idx, period in enumerate(sorted_periods)}
     
     # Для горизонтальной динамики рассчитываем min/max/mean для каждой строки отдельно
@@ -1390,9 +1415,8 @@ if uploaded_file is not None:
                             """Создает полный Excel отчёт со всеми таблицами"""
                             buffer = io.BytesIO()
                             
-                            # Импорты для форматирования Excel
-                            from openpyxl.styles import Font
-                            from openpyxl.utils import get_column_letter
+                            # Импорты для форматирования Excel (ленивый импорт)
+                            _, Font, _, get_column_letter = _get_openpyxl()
                             
                             # Получаем данные из session state
                             cohort_matrix = st.session_state.cohort_matrix
@@ -1562,11 +1586,13 @@ if uploaded_file is not None:
                                 churn_table_copy.to_excel(writer, sheet_name="5. Отток клиентов из категории", startrow=0, index=False)
                                 worksheet5 = writer.sheets["5. Отток клиентов из категории"]
                                 # Форматируем значения: числа как целые, проценты как проценты
-                                from openpyxl.styles import Alignment as ExcelAlignment
+                                # Используем ленивый импорт
+                                _, _, Alignment, _ = _get_openpyxl()
+                                ExcelAlignment = Alignment
                                 for row_idx in range(2, len(churn_table_copy) + 2):
                                     for col_idx in range(1, len(churn_table_copy.columns) + 1):
                                         cell = worksheet5.cell(row=row_idx, column=col_idx)
-                                        cell.alignment = ExcelAlignment(horizontal="center", vertical="center")
+                                        cell.alignment = Alignment(horizontal="center", vertical="center")
                                         col_name = churn_table_copy.columns[col_idx - 1]
                                         if col_name in ['Кол-во клиентов когорты', 'Накопительное кол-во возврата', 'Отток кол-во']:
                                             # Колонки с числами
@@ -1621,7 +1647,7 @@ if uploaded_file is not None:
                                             for row_idx in range(start_row_cohorts + 2, start_row_cohorts + len(summary_table_excel.index) + 2):
                                                 for col_idx in range(2, len(summary_table_excel.columns) + 2):
                                                     cell = worksheet_cohorts.cell(row=row_idx, column=col_idx)
-                                                    cell.alignment = ExcelAlignment(horizontal="center", vertical="center")
+                                                    cell.alignment = Alignment(horizontal="center", vertical="center")
                                                     row_name = summary_table_excel.index[row_idx - start_row_cohorts - 2]
                                                     
                                                     if cell.value is not None and not isinstance(cell.value, str):
@@ -1634,7 +1660,7 @@ if uploaded_file is not None:
                                             # Форматируем заголовок строки
                                             for row_idx in range(start_row_cohorts + 2, start_row_cohorts + len(summary_table_excel.index) + 2):
                                                 cell = worksheet_cohorts.cell(row=row_idx, column=1)
-                                                cell.alignment = ExcelAlignment(horizontal="left", vertical="center")
+                                                cell.alignment = Alignment(horizontal="left", vertical="center")
                                             
                                             start_row_cohorts = start_row_cohorts + len(summary_table_excel.index) + 3
                                         
@@ -1652,14 +1678,14 @@ if uploaded_file is not None:
                                             for row_idx in range(start_row_cohorts + 2, start_row_cohorts + len(category_table_excel.index) + 2):
                                                 for col_idx in range(2, len(category_table_excel.columns) + 2):
                                                     cell = worksheet_cohorts.cell(row=row_idx, column=col_idx)
-                                                    cell.alignment = ExcelAlignment(horizontal="center", vertical="center")
+                                                    cell.alignment = Alignment(horizontal="center", vertical="center")
                                                     if cell.value is not None and not isinstance(cell.value, str):
                                                         cell.number_format = '0'
                                             
                                             # Форматируем заголовок строки
                                             for row_idx in range(start_row_cohorts + 2, start_row_cohorts + len(category_table_excel.index) + 2):
                                                 cell = worksheet_cohorts.cell(row=row_idx, column=1)
-                                                cell.alignment = ExcelAlignment(horizontal="left", vertical="center")
+                                                cell.alignment = Alignment(horizontal="left", vertical="center")
                                             
                                             start_row_cohorts = start_row_cohorts + len(category_table_excel.index) + 3
                                         
@@ -1777,21 +1803,23 @@ if uploaded_file is not None:
                                                 )
                                                 worksheet_cohorts = writer.sheets["6. Присутствие когорты в других категориях"]
                                                 # Добавляем заголовок когорты
+                                                _, Font, Alignment, get_column_letter = _get_openpyxl()
                                                 last_col_letter = get_column_letter(len(new_columns) + 1)
                                                 worksheet_cohorts.cell(row=start_row_cohorts + 1, column=1, value=f"Когорта: {selected_cohort}")
                                                 worksheet_cohorts.merge_cells(f'A{start_row_cohorts + 1}:{last_col_letter}{start_row_cohorts + 1}')
                                                 header_cell = worksheet_cohorts.cell(row=start_row_cohorts + 1, column=1)
                                                 header_cell.font = Font(bold=True, size=12)
-                                                header_cell.alignment = ExcelAlignment(horizontal="center", vertical="center")
+                                                header_cell.alignment = Alignment(horizontal="center", vertical="center")
                                                 start_row_cohorts += 2
                                             else:
                                                 # Добавляем заголовок когорты
+                                                _, Font, Alignment, get_column_letter = _get_openpyxl()
                                                 last_col_letter = get_column_letter(len(new_columns) + 1)
                                                 worksheet_cohorts.cell(row=start_row_cohorts + 1, column=1, value=f"Когорта: {selected_cohort}")
                                                 worksheet_cohorts.merge_cells(f'A{start_row_cohorts + 1}:{last_col_letter}{start_row_cohorts + 1}')
                                                 header_cell = worksheet_cohorts.cell(row=start_row_cohorts + 1, column=1)
                                                 header_cell.font = Font(bold=True, size=12)
-                                                header_cell.alignment = ExcelAlignment(horizontal="center", vertical="center")
+                                                header_cell.alignment = Alignment(horizontal="center", vertical="center")
                                                 start_row_cohorts += 2
                                                 
                                                 # Записываем таблицу на тот же лист
@@ -1806,14 +1834,14 @@ if uploaded_file is not None:
                                             for row_idx in range(start_row_cohorts + 2, start_row_cohorts + len(category_period_table_with_totals.index) + 2):
                                                 for col_idx in range(2, len(category_period_table_with_totals.columns) + 2):
                                                     cell = worksheet_cohorts.cell(row=row_idx, column=col_idx)
-                                                    cell.alignment = ExcelAlignment(horizontal="center", vertical="center")
+                                                    cell.alignment = Alignment(horizontal="center", vertical="center")
                                                     if cell.value is not None and not isinstance(cell.value, str):
                                                         cell.number_format = '0'
                                             
                                             # Форматируем заголовок строки
                                             for row_idx in range(start_row_cohorts + 2, start_row_cohorts + len(category_period_table_with_totals.index) + 2):
                                                 cell = worksheet_cohorts.cell(row=row_idx, column=1)
-                                                cell.alignment = ExcelAlignment(horizontal="left", vertical="center")
+                                                cell.alignment = Alignment(horizontal="left", vertical="center")
                                             
                                             # Обновляем начальную строку для следующей таблицы (таблица + 2 пустые строки)
                                             start_row_cohorts = start_row_cohorts + len(category_period_table_with_totals.index) + 3
@@ -1919,7 +1947,7 @@ if uploaded_file is not None:
                                     for row_idx in range(2, len(summary_df.index) + 2):
                                         for col_idx in range(2, len(summary_df.columns) + 2):
                                             cell = worksheet_summary.cell(row=row_idx, column=col_idx)
-                                            cell.alignment = ExcelAlignment(horizontal="center", vertical="center")
+                                            cell.alignment = Alignment(horizontal="center", vertical="center")
                                             row_name = summary_df.index[row_idx - 2]
                                             
                                             if cell.value is not None and not isinstance(cell.value, str):
@@ -2013,6 +2041,7 @@ if uploaded_file is not None:
                                             try:
                                                 font_name = 'CyrillicFont'
                                                 font_name_bold = 'CyrillicFont-Bold'
+                                                _, _, _, _, _, _, _, _, _, _, _, _, _, _, pdfmetrics, TTFont, _ = _get_reportlab()
                                                 pdfmetrics.registerFont(TTFont(font_name, font_path))
                                                 pdfmetrics.registerFont(TTFont(font_name_bold, font_path))
                                                 break
@@ -2034,6 +2063,7 @@ if uploaded_file is not None:
                                             try:
                                                 font_name = 'CyrillicFont'
                                                 font_name_bold = 'CyrillicFont-Bold'
+                                                _, _, _, _, _, _, _, _, _, _, _, _, _, _, pdfmetrics, TTFont, _ = _get_reportlab()
                                                 pdfmetrics.registerFont(TTFont(font_name, font_path))
                                                 pdfmetrics.registerFont(TTFont(font_name_bold, font_path))
                                                 break
@@ -2050,7 +2080,8 @@ if uploaded_file is not None:
                             inflow_matrix = st.session_state.inflow_matrix
                             churn_table = st.session_state.churn_table
                             
-                            # Создаем PDF документ
+                            # Создаем PDF документ (ленивый импорт)
+                            A4, _, _, _, SimpleDocTemplate, _, _, _, _, _, _, getSampleStyleSheet, ParagraphStyle, _, _, _, _, _ = _get_reportlab()
                             doc = SimpleDocTemplate(buffer, pagesize=A4)
                             story = []
                             styles = getSampleStyleSheet()
@@ -2139,6 +2170,7 @@ if uploaded_file is not None:
                             # График 1: Динамика размера когорт
                             story.append(Paragraph("2. ДИНАМИКА РАЗМЕРА КОГОРТ", heading_style))
                             
+                            plt, _ = _get_matplotlib()
                             fig, ax = plt.subplots(figsize=(10, 6))
                             cohort_sizes = [diagonal_values[p] for p in sorted_periods]
                             ax.plot(range(len(sorted_periods)), cohort_sizes, marker='o', linewidth=2, markersize=8, color='#1f77b4')
@@ -2170,6 +2202,7 @@ if uploaded_file is not None:
                             max_cohorts = min(15, len(sorted_periods))
                             matrix_vis = accumulation_percent_matrix.iloc[:max_cohorts, :max_cohorts]
                             
+                            plt, sns = _get_matplotlib()
                             fig, ax = plt.subplots(figsize=(12, 10))
                             sns.heatmap(matrix_vis, annot=True, fmt='.1f', cmap='RdYlGn', 
                                        cbar_kws={'label': 'Процент возврата (%)'}, 
@@ -2191,6 +2224,7 @@ if uploaded_file is not None:
                             # График 3: Отток по когортам
                             story.append(Paragraph("4. АНАЛИЗ ОТТОКА КЛИЕНТОВ", heading_style))
                             
+                            plt, _ = _get_matplotlib()
                             fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6))
                             
                             # Столбчатая диаграмма оттока в количестве
