@@ -1579,10 +1579,17 @@ if uploaded_file is not None:
                                                 cell.number_format = '0.0%'  # Процентный формат Excel
                                 
                                 # Таблица 7: Присутствие клиентов оттока когорты в других категориях товаров
-                                if 'df_categories' in st.session_state and st.session_state.df_categories is not None and \
-                                   'categories_list' in st.session_state and st.session_state.categories_list is not None and \
-                                   'group_col_name' in st.session_state and st.session_state.group_col_name is not None and \
-                                   'year_month_col_name' in st.session_state and 'client_code_col_name' in st.session_state:
+                                # Проверяем наличие всех необходимых данных для таблицы 7
+                                # Таблица 7 включается только если второй документ загружен И обработан
+                                has_categories_data = (
+                                    'df_categories' in st.session_state and st.session_state.df_categories is not None and
+                                    'categories_list' in st.session_state and st.session_state.categories_list is not None and
+                                    'group_col_name' in st.session_state and st.session_state.group_col_name is not None and
+                                    'year_month_col_name' in st.session_state and 'client_code_col_name' in st.session_state and
+                                    'category_summary_table' in st.session_state and st.session_state.category_summary_table is not None
+                                )
+                                
+                                if has_categories_data:
                                     
                                     df_categories = st.session_state.df_categories
                                     categories = st.session_state.categories_list
@@ -1796,6 +1803,8 @@ if uploaded_file is not None:
                                         start_row_cohorts = start_row_cohorts + len(category_period_table_with_totals.index) + 3
                                 
                                 # Таблица 8: Сводная таблица по всем когортам
+                                # Таблица 8 всегда создаётся с базовыми метриками (1-5)
+                                # Метрики 6-9 добавляются только при наличии данных категорий
                                 if st.session_state.get('churn_table') is not None:
                                     churn_table = st.session_state.churn_table
                                     
