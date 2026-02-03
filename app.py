@@ -78,45 +78,11 @@ def create_copy_button(text, button_label, key):
                 <p id="copy_btn_text_{safe_key}" style="margin: 0; padding: 0; font-size: 0.85rem; font-weight: 400; line-height: 1.3; word-wrap: break-word; overflow-wrap: break-word; white-space: normal;">{button_label}</p>
             </div>
         </button>
-        <div id="copy_status_{safe_key}" style="
-            margin-top: 8px;
-            padding: 10px 16px;
-            background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
-            color: white;
-            font-size: 0.95rem;
-            font-weight: 600;
-            text-align: center;
-            border-radius: 6px;
-            box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
-            display: none;
-            animation: slideIn 0.3s ease-out;
-            position: relative;
-            overflow: hidden;
-        ">
-            <span style="font-size: 1.2em; margin-right: 8px;">✓</span>
-            <span>Коды клиентов скопированы в буфер обмена!</span>
-        </div>
         <style>
-            @keyframes slideIn {{
-                from {{
-                    opacity: 0;
-                    transform: translateY(-10px);
-                }}
-                to {{
-                    opacity: 1;
-                    transform: translateY(0);
-                }}
-            }}
             @keyframes pulse {{
                 0% {{ transform: scale(1); }}
                 50% {{ transform: scale(1.05); }}
                 100% {{ transform: scale(1); }}
-            }}
-            .copy-success {{
-                background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%) !important;
-                border-color: #4CAF50 !important;
-                color: white !important;
-                animation: pulse 0.5s ease-in-out;
             }}
         </style>
     </div>
@@ -127,7 +93,6 @@ def create_copy_button(text, button_label, key):
             const text = textToCopy_{safe_key};
             const button = document.getElementById('copy_btn_{safe_key}');
             const buttonText = document.getElementById('copy_btn_text_{safe_key}');
-            const status = document.getElementById('copy_status_{safe_key}');
             const originalText = buttonText.innerHTML;
             
             // Функция для показа успешного копирования
@@ -140,9 +105,6 @@ def create_copy_button(text, button_label, key):
                 button.style.transform = 'scale(0.98)';
                 buttonText.innerHTML = '✓ Скопировано!';
                 
-                // Показываем статус сообщение
-                status.style.display = 'block';
-                
                 // Возвращаем исходное состояние через 2.5 секунды
                 setTimeout(function() {{
                     button.classList.remove('copied');
@@ -151,7 +113,6 @@ def create_copy_button(text, button_label, key):
                     button.style.color = '#333';
                     button.style.transform = 'translateY(0)';
                     buttonText.innerHTML = originalText;
-                    status.style.display = 'none';
                 }}, 2500);
             }}
             
@@ -197,7 +158,7 @@ def create_copy_button(text, button_label, key):
         }}
     </script>
     """
-    components.html(html, height=100)
+    components.html(html, height=70)
 
 st.title("📊 Когортный анализ, возвращаемость и отток")
 st.markdown("---")
