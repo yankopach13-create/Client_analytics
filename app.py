@@ -48,32 +48,32 @@ st.markdown("""
         font-weight: bold;
         padding: 10px 20px;
         border-radius: 8px;
-        border: none;
+                        border: none;
         transition: background-color 0.3s ease;
     }
     .stButton > button:hover {
         background-color: #45a049;
-    }
-</style>
-""", unsafe_allow_html=True)
-
+                    }
+                    </style>
+                    """, unsafe_allow_html=True)
+                    
 # Главная страница
 st.markdown('<div class="main-header">', unsafe_allow_html=True)
 st.title("📊 Клиентская аналитика")
 st.markdown('</div>', unsafe_allow_html=True)
 
-st.markdown("---")
-
+                    st.markdown("---")
+                    
 # Описание
-st.markdown("""
+                        st.markdown("""
 <div style="text-align: center; font-size: 1.1em; color: #555; margin-bottom: 30px;">
     Добро пожаловать в систему клиентской аналитики!<br>
     Выберите инструмент для работы:
-</div>
+                                    </div>
 """, unsafe_allow_html=True)
 
 # Информация о навигации
-st.info("💡 **Навигация:** Используйте боковое меню слева или нажмите на ссылку под карточкой инструмента для перехода.")
+st.info("💡 **Навигация:** Нажмите на кнопку под карточкой инструмента для перехода.")
 st.markdown("")
 
 # Список доступных инструментов
@@ -102,29 +102,29 @@ for i in range(0, len(tools), 2):
                 <div class="tool-name">{tool['name']}</div>
                 <div class="tool-description">{tool['description']}</div>
             </div>
-            """, unsafe_allow_html=True)
-            
-            # Используем простую markdown ссылку Streamlit
-            # Streamlit автоматически обрабатывает ссылки на страницы в папке pages/
+                                    """, unsafe_allow_html=True)
+                                
+            # Кнопка для перехода к инструменту
+            # Используем правильный формат для Streamlit Pages
             page_name = tool['page']
             
-            # Создаем простую markdown ссылку (Streamlit автоматически обработает её)
-            # Используем чистый markdown - Streamlit автоматически преобразует ссылки
-            st.markdown(f"""
-            <div style="text-align: center; margin-top: 15px;">
-                <a href="/pages/{page_name}" style="
-                    display: inline-block;
-                    width: 100%;
-                    padding: 12px 30px;
-                    background-color: #4CAF50;
-                    color: white !important;
-                    text-decoration: none;
-                    border-radius: 8px;
-                    font-weight: bold;
-                    text-align: center;
-                ">🔄 Открыть инструмент</a>
-            </div>
-            """, unsafe_allow_html=True)
+            # Создаем кнопку с правильной навигацией
+            if st.button(f"🔄 Открыть инструмент", key=f"btn_{i+j}", use_container_width=True):
+                # Используем правильный формат для Streamlit Pages: "pages/filename" без расширения
+                try:
+                    st.switch_page(f"pages/{page_name}")
+                except:
+                    # Если не работает, показываем информацию о прямой ссылке
+                    st.info(f"💡 Если кнопка не работает, используйте прямую ссылку в адресной строке: `https://client-analytics.streamlit.app/pages/{page_name}`")
+            
+            # Дополнительная информация о навигации
+            with st.expander("ℹ️ Как перейти к инструменту?"):
+                st.markdown(f"""
+                **Способы навигации:**
+                1. Нажмите кнопку "🔄 Открыть инструмент" выше
+                2. Используйте прямую ссылку в адресной строке браузера: 
+                   `https://client-analytics.streamlit.app/pages/{page_name}`
+                """)
 
 # Если инструментов нечетное количество, добавляем пустую колонку
 if len(tools) % 2 == 1:
@@ -132,8 +132,8 @@ if len(tools) % 2 == 1:
 
 # Информация о системе
 st.markdown("---")
-st.markdown("""
+                        st.markdown("""
 <div style="text-align: center; color: #666; padding: 20px;">
     <p>Система клиентской аналитики</p>
 </div>
-""", unsafe_allow_html=True)
+                        """, unsafe_allow_html=True)
