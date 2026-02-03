@@ -181,6 +181,10 @@ div[data-testid="stDataFrame"] td {
 # Инициализация session state для хранения загруженных данных
 if 'uploaded_data' not in st.session_state:
     st.session_state.uploaded_data = None
+
+# Инициализируем флаг загрузки второго файла
+if 'categories_file_uploaded' not in st.session_state:
+    st.session_state.categories_file_uploaded = False
 if 'df' not in st.session_state:
     st.session_state.df = None
 if 'cohort_matrix' not in st.session_state:
@@ -1579,14 +1583,18 @@ if uploaded_file is not None:
                                                 cell.number_format = '0.0%'  # Процентный формат Excel
                                 
                                 # Таблица 7: Присутствие клиентов оттока когорты в других категориях товаров
+                                # Проверяем наличие загруженного второго файла
+                                # Таблица 7 включается только если второй документ загружен
+                                has_categories_file = st.session_state.get('categories_file_uploaded', False)
+                                
                                 # Проверяем наличие всех необходимых данных для таблицы 7
-                                # Таблица 7 включается только если второй документ загружен И обработан
+                                # Если файл загружен, данные должны быть обработаны
                                 has_categories_data = (
+                                    has_categories_file and
                                     'df_categories' in st.session_state and st.session_state.df_categories is not None and
                                     'categories_list' in st.session_state and st.session_state.categories_list is not None and
                                     'group_col_name' in st.session_state and st.session_state.group_col_name is not None and
-                                    'year_month_col_name' in st.session_state and 'client_code_col_name' in st.session_state and
-                                    'category_summary_table' in st.session_state and st.session_state.category_summary_table is not None
+                                    'year_month_col_name' in st.session_state and 'client_code_col_name' in st.session_state
                                 )
                                 
                                 if has_categories_data:
@@ -3067,6 +3075,9 @@ if uploaded_file is not None:
                                 st.session_state.category_summary_table = summary_table_excel
                                 st.session_state.category_cohort_table = None
                                 
+                                # Устанавливаем флаг успешной загрузки и обработки второго файла
+                                st.session_state.categories_file_uploaded = True
+                                
                                 # Обновляем Excel отчёт после сохранения всех данных
                                 if 'excel_report_cache_key' in st.session_state:
                                     del st.session_state.excel_report_cache_key
@@ -3367,6 +3378,19 @@ if uploaded_file is not None:
                         except Exception as e:
                             st.error(f"❌ Ошибка при обработке файла: {str(e)}")
                             st.exception(e)
+                            # Сбрасываем флаг при ошибке обработки
+                            st.session_state.categories_file_uploaded = False
+                    else:
+                        # Если файл не загружен, сбрасываем флаг и очищаем данные
+                        if st.session_state.get('categories_file_uploaded', False):
+                            st.session_state.categories_file_uploaded = False
+                            # Очищаем данные категорий
+                            if 'df_categories' in st.session_state:
+                                del st.session_state.df_categories
+                            if 'category_summary_table' in st.session_state:
+                                del st.session_state.category_summary_table
+                            if 'category_cohort_table' in st.session_state:
+                                del st.session_state.category_cohort_table
                     
                     # Сводная таблица по всем когортам (после блока присутствия клиентов)
                     st.markdown("---")
