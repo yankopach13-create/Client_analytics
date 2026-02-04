@@ -16,5 +16,4 @@ tools = [
 ]
 
 for name, url, desc in tools:
-    st.link_button(f"**{name}** — {desc}", url, use_container_width=True)
-    st.markdown("")
+    st.markdown(f"[**{name}** — {desc}]({url})")
