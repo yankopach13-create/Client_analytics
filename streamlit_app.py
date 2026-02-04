@@ -18,7 +18,6 @@ tools = [
 for name, url, desc, tooltip_text in tools:
     col_info, col_btn = st.columns([0.06, 0.94])
     with col_info:
-        with st.tooltip(tooltip_text):
-            st.markdown("ℹ️")
+        st.markdown(f'<span title="{tooltip_text}" style="cursor: help; font-size: 1.2em;">ℹ️</span>', unsafe_allow_html=True)
     with col_btn:
         st.link_button(f"**{name}** — {desc}", url, use_container_width=True)
