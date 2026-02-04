@@ -32,17 +32,18 @@ st.markdown("""
         visibility: hidden;
         opacity: 0;
         position: absolute;
-        left: 100%;
+        right: 100%;
         top: 50%;
         transform: translateY(-50%);
-        margin-left: 10px;
+        margin-right: 10px;
         padding: 14px 18px;
         background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
         border-radius: 10px;
         box-shadow: 0 10px 40px rgba(0,0,0,0.15), 0 2px 8px rgba(0,0,0,0.08);
         font-size: 14px;
         line-height: 1.55;
-        max-width: 360px;
+        width: 420px;
+        max-width: 90vw;
         z-index: 9999;
         border: 1px solid #e2e8f0;
         color: #334155;
@@ -51,11 +52,12 @@ st.markdown("""
     .info-tooltip::before {
         content: '';
         position: absolute;
-        left: -6px;
+        right: -6px;
+        left: auto;
         top: 50%;
         transform: translateY(-50%);
         border: 6px solid transparent;
-        border-right-color: #e2e8f0;
+        border-left-color: #e2e8f0;
     }
     .info-wrapper:hover .info-tooltip {
         visibility: visible;
