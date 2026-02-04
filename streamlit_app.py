@@ -12,12 +12,20 @@ st.markdown("Выберите инструмент для работы с дан
 st.markdown("---")
 
 tools = [
-    ("Когортный анализ", "https://cohortanalysisbelvape.streamlit.app/", "Анализ поведения когорт клиентов", "Описание будет добавлено"),
+    (
+        "Когортный анализ",
+        "https://cohortanalysisbelvape.streamlit.app/",
+        "Анализ поведения когорт клиентов",
+        "Инструмент для анализа групп клиентов (когорт) по данным из Qlik. Построение матриц возвращаемости на продукт, оттока, присутствия в другом продукте и оттока из сети.",
+    ),
 ]
 
 for name, url, desc, tooltip_text in tools:
     col_info, col_btn = st.columns([0.06, 0.94])
     with col_info:
-        st.markdown(f'<span title="{tooltip_text}" style="cursor: help; font-size: 1.2em;">ℹ️</span>', unsafe_allow_html=True)
+        st.markdown(
+            f'<span title="{tooltip_text}" style="display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 50%; background: #6b7280; color: white; font-size: 12px; font-weight: bold; font-style: italic; cursor: help;">i</span>',
+            unsafe_allow_html=True,
+        )
     with col_btn:
         st.link_button(f"**{name}** — {desc}", url, use_container_width=True)
