@@ -41,9 +41,10 @@ st.markdown("""
         border-radius: 10px;
         box-shadow: 0 10px 40px rgba(0,0,0,0.15), 0 2px 8px rgba(0,0,0,0.08);
         font-size: 14px;
-        line-height: 1.55;
-        width: 420px;
+        line-height: 1.7;
+        width: 380px;
         max-width: 90vw;
+        min-height: 80px;
         z-index: 9999;
         border: 1px solid #e2e8f0;
         color: #334155;
@@ -81,8 +82,9 @@ tools = [
 for name, url, tooltip_text in tools:
     col_info, col_btn = st.columns([0.06, 0.94])
     with col_info:
+        tooltip_html = tooltip_text.replace(". ", ".<br><br>", 1)
         st.markdown(
-            f'<div class="info-wrapper"><span class="info-icon">i</span><span class="info-tooltip">{tooltip_text}</span></div>',
+            f'<div class="info-wrapper"><span class="info-icon">i</span><span class="info-tooltip">{tooltip_html}</span></div>',
             unsafe_allow_html=True,
         )
     with col_btn:
